@@ -1,14 +1,16 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-// Thiếu secret = mọi token có thể bị giả mạo. Từ chối chạy thay vì âm thầm dùng giá trị mặc định.
-const JWT_SECRET: string = (() => {
+// Thiếu secret = mọi token có thể bị giả mạo. Từ chối phục vụ thay vì âm thầm dùng giá trị mặc định.
+// Kiểm tra tại thời điểm gọi (không phải lúc nạp module) để `next build` trong Docker —
+// vốn không có env runtime — vẫn build được.
+function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('Thiếu biến môi trường JWT_SECRET — xem HUONG-DAN-CAI-DAT.md mục 1.');
   }
   return secret;
-})();
+}
 
 /**
  * Băm mật khẩu người dùng
@@ -30,7 +32,7 @@ export async function comparePassword(password: string, hash: string): Promise<b
  */
 export function signJWT(payload: { userId: string; username: string; role: string }): string {
   // Token có hiệu lực trong 7 ngày
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
 }
 
 /**
@@ -38,7 +40,7 @@ export function signJWT(payload: { userId: string; username: string; role: strin
  */
 export function verifyJWT(token: string): { userId: string; username: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username: string; role: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; username: string; role: string };
     return decoded ?? null;
   } catch (error) {
     return null;

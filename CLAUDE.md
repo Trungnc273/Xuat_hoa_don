@@ -65,6 +65,17 @@ Docker Desktop tự khởi động.
   timeout: 20000 }` cho các transaction nặng (tạo hóa đơn, convert). **Bài học:** thêm khóa tuần tự thì
   phải nghĩ ngay đến hàng đợi phía sau nó.
 
+- **03/07/2026 — Bắt buộc env var lúc nạp module làm vỡ `next build` trong Docker.** Ném lỗi thiếu
+  `JWT_SECRET` ở top-level module khiến build stage (không có env runtime) chết. Giải pháp: kiểm tra lười
+  trong hàm `getJwtSecret()` — vẫn chặn runtime, không chặn build.
+- **03/07/2026 — Verify phải chắc chắn mình đang gọi đúng tiến trình.** Một dev server mồ côi giữ port 3000
+  khiến "verify prod" thực chất chạy trên dev (kết quả đẹp giả), còn container prod không lên được vì kẹt
+  port; đồng thời log build bị cắt (`| tail -3`) che mất lỗi build fail. **Bài học:** trước khi verify,
+  xác nhận tiến trình phục vụ port (docker ps + kill node mồ côi); không pipe-cắt log của lệnh có thể fail.
+- **03/07/2026 — Trộn 2 phiên bản code trên cùng DB làm lệch bộ đếm mã.** Ảnh cũ (count()+1) tạo chứng từ
+  vượt xa `document_counters` → ảnh mới sinh mã trùng (P2002). Đã có sẵn SQL resync bộ đếm theo MAX(code)
+  từng bảng (xem lịch sử chat 03/07 hoặc migration backfill làm mẫu) — chạy khi nghi ngờ lệch.
+
 ## Việc đang dang dở / điểm tiếp theo
 
 - Giai đoạn 0 (nền tảng vận hành) đã xong: Docker hóa, backup, hướng dẫn cài đặt.
