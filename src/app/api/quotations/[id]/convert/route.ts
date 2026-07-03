@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/server/auth';
+import { requirePermission } from '@/server/rbac';
 import { handleError, fail } from '@/server/http';
 import { logActivity } from '@/server/activity-log';
 import { BusinessError, convertQuotationToInvoice } from '@/server/services/quotation.service';
@@ -7,7 +7,7 @@ import { BusinessError, convertQuotationToInvoice } from '@/server/services/quot
 // POST: Chuyển đổi báo giá thành hóa đơn (Route mỏng: auth → service → response)
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireAuth(req, ['ADMIN', 'MANAGER', 'STAFF']);
+    const auth = await requirePermission(req, 'CREATE', 'Invoice');
     if (!auth.ok) return auth.response;
 
     const { id } = await params;

@@ -3,6 +3,7 @@ import { handleError } from '@/server/http';
 import { partnerSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { requirePermission } from '@/server/rbac';
 import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách khách hàng (có tìm kiếm, phân trang, sắp xếp)
@@ -65,15 +66,9 @@ export async function GET(req: Request) {
 // 2. POST: Thêm mới khách hàng
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
-
-    // Kiểm tra quyền (Chỉ Admin, Manager, Staff mới được tạo khách hàng)
-    if (!['ADMIN', 'MANAGER', 'STAFF'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const auth = await requirePermission(req, 'CREATE', 'Customer'); // RBAC theo bảng Permission (SPEC GĐ3, FR-3)
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
 
     const body = partnerSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { name, company, taxCode, address, email, phone, contactPerson, note } = body;

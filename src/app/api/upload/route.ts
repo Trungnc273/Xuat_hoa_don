@@ -18,6 +18,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Không tìm thấy tệp tải lên' }, { status: 400 });
     }
 
+    // Giới hạn upload: chỉ ảnh, tối đa 5MB (SPEC GĐ3, FR-5)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Chỉ chấp nhận file ảnh (JPG, PNG, WebP)' }, { status: 400 });
+    }
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: `File quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB) — tối đa 5MB` },
+        { status: 400 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 

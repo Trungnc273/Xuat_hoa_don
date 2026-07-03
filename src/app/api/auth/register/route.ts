@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { handleError } from '@/server/http';
+import { requireAuth } from '@/server/auth';
 import { registerSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
+    // Đóng đăng ký công khai (SPEC GĐ3, FR-2) — chỉ ADMIN được tạo tài khoản
+    const auth = await requireAuth(req, ['ADMIN']);
+    if (!auth.ok) return auth.response;
+
     const { username, email, password, roleName } = registerSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
 
     if (!username || !email || !password) {

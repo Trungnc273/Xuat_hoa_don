@@ -3,19 +3,14 @@ import { handleError } from '@/server/http';
 import { stockAdjustSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { requirePermission } from '@/server/rbac';
 
 // POST: Thực hiện điều chỉnh hoặc nhập/xuất kho thủ công
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
-
-    // Chỉ Admin và Manager mới được điều chỉnh kho
-    if (!['ADMIN', 'MANAGER'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const auth = await requirePermission(req, 'UPDATE', 'Product'); // RBAC theo bảng Permission (SPEC GĐ3, FR-3)
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
 
     const body = stockAdjustSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { productId, warehouseId, type, quantity, reason, note } = body;

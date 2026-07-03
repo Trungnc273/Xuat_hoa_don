@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { requireAuth } from '@/server/auth';
+import { requirePermission } from '@/server/rbac';
 import { handleError } from '@/server/http';
 import { logActivity } from '@/server/activity-log';
 import { createInvoiceSchema } from '@/server/validators/sales';
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
 // 2. POST: Tạo mới hóa đơn trực tiếp (Route mỏng: auth → validate → service → response)
 export async function POST(req: Request) {
   try {
-    const auth = await requireAuth(req, ['ADMIN', 'MANAGER', 'STAFF']);
+    const auth = await requirePermission(req, 'CREATE', 'Invoice');
     if (!auth.ok) return auth.response;
 
     const input = createInvoiceSchema.parse(await req.json());

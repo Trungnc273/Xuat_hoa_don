@@ -85,7 +85,10 @@ Docker Desktop tự khởi động.
 - **Giai đoạn 2 đã xong (03/07/2026)**: khung src/server (http/auth/activity-log), Zod validators, services
   (invoice core dùng chung cho tạo trực tiếp + convert), Organization/organizationId (nullable, chưa dùng),
   middleware → proxy. Verify GĐ1 10/10 + GĐ2 4/4 trên dev lẫn prod Docker.
-- **Tiếp theo: Giai đoạn 3** — RBAC theo bảng Permission, đóng /register công khai, verify JWT trong proxy,
-  giới hạn upload. Viết SPEC trước khi làm.
+- **Giai đoạn 3 đã xong (03/07/2026)**: RBAC theo bảng Permission (src/server/rbac.ts, cache 60s), màn
+  Quản lý tài khoản /users cho ADMIN (tạo/đổi vai trò/đặt lại mật khẩu; không xóa, không tự đổi vai trò),
+  đóng /register công khai, proxy verify JWT bằng WebCrypto, upload chỉ ảnh ≤5MB. Verify 22/22.
+- **Tiếp theo: Giai đoạn 4** — cache dữ liệu đọc nhiều, rà UI 4 vai trò, kiểm thử luồng nghiệm thu MVP
+  (Mục 7 DANH-GIA-VA-LO-TRINH.md), tùy chọn: đổi mật khẩu cá nhân, khóa tài khoản (isActive).
 - Vai trò hệ thống hiện dùng: ADMIN, MANAGER, ACCOUNTANT, STAFF (đã xác nhận đúng nhu cầu người dùng).
 - Git: repo https://github.com/Trungnc273/Xuat_hoa_don (private), quy ước mỗi task một commit.

@@ -182,10 +182,10 @@ PostgreSQL (DB)  +  Cache (đọc nhiều)  +  Lưu trữ file (uploads)
 > Kết thúc GĐ2: **base code ổn, dễ bảo trì và mở rộng**.
 
 ### Giai đoạn 3 — Hoàn thiện phân quyền & bảo mật
-- [ ] Kích hoạt RBAC thật theo bảng Permission đã có sẵn trong seed.
-- [ ] Middleware xác minh chữ ký JWT (mục E), giới hạn upload (mục F).
-- [ ] Rà soát từng route để gắn đúng quyền theo vai trò.
-- [ ] Đóng trang đăng ký công khai `/register` — chỉ Admin tạo tài khoản (xem Mục 0b).
+- [x] Kích hoạt RBAC thật theo bảng Permission đã có sẵn trong seed.
+- [x] Proxy xác minh chữ ký JWT bằng WebCrypto (mục E), giới hạn upload ảnh ≤5MB (mục F).
+- [x] Rà soát từng route để gắn đúng quyền theo vai trò (requirePermission).
+- [x] Đóng trang đăng ký công khai `/register`; thêm màn Quản lý tài khoản riêng cho Admin (/users).
 > Kết thúc GĐ3: **nhiều vai trò hoạt động đúng như bạn cần**.
 
 ### Giai đoạn 4 — Tối ưu & sẵn sàng phát hành

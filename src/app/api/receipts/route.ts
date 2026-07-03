@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { requireAuth } from '@/server/auth';
+import { requirePermission } from '@/server/rbac';
 import { handleError, fail } from '@/server/http';
 import { logActivity } from '@/server/activity-log';
 import { createReceiptSchema } from '@/server/validators/sales';
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     // Chỉ Admin, Manager hoặc Kế toán được lập phiếu thu
-    const auth = await requireAuth(req, ['ADMIN', 'MANAGER', 'ACCOUNTANT']);
+    const auth = await requirePermission(req, 'CREATE', 'Receipt');
     if (!auth.ok) return auth.response;
 
     const input = createReceiptSchema.parse(await req.json());

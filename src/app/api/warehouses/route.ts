@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { requirePermission } from '@/server/rbac';
 import { generateDocumentCode } from '@/lib/codegen';
 
 // GET: Lấy danh sách kho hàng
@@ -25,14 +26,9 @@ export async function GET(req: Request) {
 // POST: Tạo kho hàng mới
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
-
-    if (!['ADMIN', 'MANAGER'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const auth = await requirePermission(req, 'CREATE', 'Warehouse'); // RBAC theo bảng Permission (SPEC GĐ3, FR-3)
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
 
     const body = await req.json();
     const { name, address, description } = body;

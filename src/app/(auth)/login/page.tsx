@@ -154,13 +154,9 @@ function LoginForm() {
           </div>
 
           <div className="border-t border-border pt-4 text-center">
-            <span className="text-sm text-muted-foreground">Bạn chưa có tài khoản? </span>
-            <Link
-              href="/register"
-              className="text-sm font-bold text-foreground hover:underline transition-all"
-            >
-              Đăng ký ngay
-            </Link>
+            <span className="text-sm text-muted-foreground">
+              Chưa có tài khoản? Liên hệ quản trị viên để được cấp.
+            </span>
           </div>
         </div>
       </div>

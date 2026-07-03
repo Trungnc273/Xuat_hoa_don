@@ -3,6 +3,7 @@ import { handleError } from '@/server/http';
 import { createPaymentSchema } from '@/server/validators/sales';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { requirePermission } from '@/server/rbac';
 import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách phiếu chi
@@ -64,14 +65,9 @@ export async function GET(req: Request) {
 // 2. POST: Lập phiếu chi mới
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
-
-    if (!['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const auth = await requirePermission(req, 'CREATE', 'Payment'); // RBAC theo bảng Permission (SPEC GĐ3, FR-3)
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
 
     const body = createPaymentSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { supplierId, amount, date, paymentMethod, note } = body;
