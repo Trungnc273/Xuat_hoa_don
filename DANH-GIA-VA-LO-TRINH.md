@@ -189,9 +189,9 @@ PostgreSQL (DB)  +  Cache (đọc nhiều)  +  Lưu trữ file (uploads)
 > Kết thúc GĐ3: **nhiều vai trò hoạt động đúng như bạn cần**.
 
 ### Giai đoạn 4 — Tối ưu & sẵn sàng phát hành
-- [ ] Thêm cache cho dashboard/danh mục/cài đặt.
-- [ ] Bổ sung phân trang/tìm kiếm còn thiếu, kiểm thử các luồng chính.
-- [ ] (Tùy chọn) Chuyển lưu trữ file sang dịch vụ ngoài khi triển khai.
+- [x] Thêm cache cho dashboard/danh mục/cài đặt (in-memory TTL + xóa chủ động).
+- [x] Kiểm thử các luồng chính: verify-mvp.mjs 9/9 (trọn luồng + smoke 4 vai trò + restart).
+- [ ] (Tùy chọn — chưa cần) Chuyển lưu trữ file sang dịch vụ ngoài khi lên VPS.
 > Kết thúc GĐ4: **MVP hoàn thiện, mượt và sẵn sàng dùng.**
 
 ---
@@ -200,12 +200,12 @@ PostgreSQL (DB)  +  Cache (đọc nhiều)  +  Lưu trữ file (uploads)
 
 MVP được coi là hoàn thành khi luồng nghiệp vụ trọn vẹn sau chạy trơn tru trên bản cài Docker tại một máy cửa hàng, không lỗi, đúng phân quyền:
 
-1. Admin tạo tài khoản nhân viên (không còn đăng ký công khai).
-2. Nhập sản phẩm + tồn kho ban đầu → tạo khách hàng.
-3. Tạo báo giá → chuyển thành hóa đơn (mã không trùng, không bán vượt kho).
-4. In/xuất hóa đơn có VietQR → lập phiếu thu → công nợ cập nhật đúng.
-5. Xem dashboard và nhật ký hoạt động phản ánh đúng các thao tác trên.
-6. Tắt máy, bật lại → hệ thống tự chạy lại, dữ liệu nguyên vẹn; file backup hằng ngày tồn tại thật.
+1. ✅ Admin tạo tài khoản nhân viên (không còn đăng ký công khai).
+2. ✅ Nhập sản phẩm + tồn kho ban đầu → tạo khách hàng.
+3. ✅ Tạo báo giá → chuyển thành hóa đơn (mã không trùng; bán vượt kho được phép + cảnh báo, theo quyết định 03/07).
+4. ✅ Hóa đơn có VietQR → lập phiếu thu → công nợ cập nhật đúng (PAID, còn nợ 0).
+5. ✅ Dashboard và nhật ký hoạt động phản ánh đúng các thao tác trên.
+6. ✅ Restart container → dữ liệu nguyên vẹn (verify-mvp B8); backup tay đã chạy nhiều lần — backup TỰ ĐỘNG cần người dùng chạy script đăng ký 1 lần (quyền Admin).
 
 ## 8. Việc cần bạn quyết định tiếp
 

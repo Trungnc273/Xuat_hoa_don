@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { cached, invalidateCache } from '@/server/cache';
 
 // GET: Lấy toàn bộ danh mục
 export async function GET(req: Request) {
@@ -10,9 +11,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
     }
 
-    const categories = await prisma.category.findMany({
-      orderBy: { name: 'asc' },
-    });
+    // Cache 5 phút — xóa chủ động khi có thay đổi danh mục (SPEC GĐ4, FR-1)
+    const categories = await cached('categories', 5 * 60_000, () =>
+      prisma.category.findMany({ orderBy: { name: 'asc' } })
+    );
 
     return NextResponse.json({ categories });
   } catch (error) {
@@ -55,6 +57,7 @@ export async function POST(req: Request) {
       },
     });
 
+    invalidateCache('categories');
     return NextResponse.json({ message: 'Tạo danh mục thành công', category });
   } catch (error) {
     console.error('Lỗi POST Category:', error);

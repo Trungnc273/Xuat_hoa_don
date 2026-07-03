@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { cached, invalidateCache } from '@/server/cache';
 
 // 1. GET: Lấy cấu hình doanh nghiệp hiện tại
 export async function GET(req: Request) {
@@ -10,11 +11,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
     }
 
-    let setting = await prisma.setting.findFirst();
-
-    // Nếu chưa có cài đặt nào, tạo cấu hình mặc định trống
-    if (!setting) {
-      setting = await prisma.setting.create({
+    // Cache 5 phút — xóa chủ động khi POST cập nhật (SPEC GĐ4, FR-1)
+    const setting = await cached('settings', 5 * 60_000, async () => {
+      const existing = await prisma.setting.findFirst();
+      if (existing) return existing;
+      // Nếu chưa có cài đặt nào, tạo cấu hình mặc định trống
+      return prisma.setting.create({
         data: {
           companyName: 'Tên Doanh Nghiệp Mới',
           taxCode: '',
@@ -26,7 +28,7 @@ export async function GET(req: Request) {
           representative: '',
         },
       });
-    }
+    });
 
     return NextResponse.json({ setting });
   } catch (error) {
@@ -89,6 +91,9 @@ export async function POST(req: Request) {
         },
       });
     }
+
+    // Xóa cache để GET tiếp theo thấy giá trị mới ngay (SPEC GĐ4, FR-1)
+    invalidateCache('settings');
 
     // Ghi nhật ký
     await prisma.activityLog.create({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { invalidateCache } from '@/server/cache';
 
 // PUT: Cập nhật thông tin danh mục
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,6 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
     });
 
+    invalidateCache('categories');
     return NextResponse.json({ message: 'Cập nhật danh mục thành công', category: updatedCategory });
   } catch (error) {
     console.error('Lỗi PUT Category:', error);
@@ -77,6 +79,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       });
     });
 
+    invalidateCache('categories');
     return NextResponse.json({ message: 'Xóa danh mục thành công' });
   } catch (error) {
     console.error('Lỗi DELETE Category:', error);

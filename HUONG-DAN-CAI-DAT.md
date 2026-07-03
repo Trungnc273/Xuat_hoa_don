@@ -1,81 +1,101 @@
-# Hướng dẫn cài đặt & vận hành
+# Hướng dẫn cài đặt, chạy & demo
 
-> Dành cho người mới nhận dự án hoặc cài cho khách hàng mới.
-> Yêu cầu duy nhất: **Docker Desktop** (và Node.js 22 nếu muốn lập trình).
+> Dành cho người mới nhận dự án hoặc cài cho khách hàng mới. Cập nhật: 03/07/2026 (sau GĐ4).
+
+## 0. Yêu cầu máy
+
+| Thành phần | Bắt buộc | Ghi chú |
+|---|---|---|
+| Docker Desktop | ✅ | Cách cài: https://www.docker.com/products/docker-desktop — đủ để chạy bản production |
+| Node.js 22 | Chỉ khi lập trình | Chạy dev server, seed, script verify |
+| Git | Chỉ khi lập trình | Kéo code từ https://github.com/Trungnc273/Xuat_hoa_don |
+| ngrok | Chỉ khi demo khách | Xem mục 5 |
+
+Máy tối thiểu: 8GB RAM (Docker Desktop chiếm ~2–3GB), Windows 10/11.
 
 ---
 
 ## 1. Cài cho máy phát triển (dev)
 
 ```bash
-# 1. Cài dependencies
+git clone https://github.com/Trungnc273/Xuat_hoa_don.git
+cd Xuat_hoa_don
 npm install
 
-# 2. Tạo file cấu hình
-#    Sao chép .env.example thành .env rồi điền:
-#    DATABASE_URL="postgresql://hoadon:hoadon_dev_2026@localhost:5433/web_xuat_hoa_don?schema=public"
-#    JWT_SECRET=<chuỗi ngẫu nhiên dài, KHÔNG dùng giá trị mẫu>
+# Tạo file .env (sao chép từ .env.example) với nội dung:
+#   DATABASE_URL="postgresql://hoadon:hoadon_dev_2026@localhost:5433/web_xuat_hoa_don?schema=public"
+#   JWT_SECRET=<chuỗi ngẫu nhiên dài ít nhất 32 ký tự — KHÔNG dùng giá trị mẫu>
+#   NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-# 3. Bật CSDL (PostgreSQL trong Docker, port 5433)
-docker compose up -d db
-
-# 4. Tạo bảng + dữ liệu mẫu
-npx prisma migrate dev
-npx prisma db seed
-
-# 5. Chạy app
-npm run dev
-# → http://localhost:3000
+docker compose up -d db      # bật PostgreSQL (port 5433)
+npx prisma migrate dev       # tạo bảng
+npx prisma db seed           # dữ liệu mẫu + tài khoản mặc định
+npm run dev                  # → http://localhost:3000
 ```
 
-**Tài khoản mẫu sau khi seed** (đổi mật khẩu ngay khi dùng thật):
+**Tài khoản mẫu sau khi seed** (đổi hết mật khẩu khi dùng thật):
 
 | Tài khoản | Mật khẩu | Vai trò |
 |---|---|---|
-| admin | admin123 | ADMIN |
-| manager | manager123 | MANAGER |
-| accountant | accountant123 | ACCOUNTANT |
-| staff | staff123 | STAFF |
+| admin | admin123 | ADMIN — toàn quyền, có màn Quản lý tài khoản (/users) |
+| manager | manager123 | MANAGER — khách hàng, sản phẩm, kho, báo giá, hóa đơn |
+| accountant | accountant123 | ACCOUNTANT — hóa đơn, thu/chi, công nợ |
+| staff | staff123 | STAFF — bán hàng, chỉ thấy chứng từ mình tạo |
+
+**Kiểm tra sức khỏe hệ thống** (app phải đang chạy):
+```bash
+node scripts/verify-gd1.mjs && node scripts/verify-gd2.mjs && node scripts/verify-gd3.mjs
+node scripts/verify-mvp.mjs            # trọn luồng nghiệp vụ
+```
 
 ---
 
-## 2. Cài cho máy cửa hàng (production nội bộ, chạy trọn trong Docker)
+## 2. Cài cho máy cửa hàng (production nội bộ — trọn trong Docker)
 
 ```bash
-# 1. Tạo file .env chỉ cần một dòng (bắt buộc, không có sẽ không chạy):
+# 1. File .env chỉ cần một dòng (bắt buộc):
 #    JWT_SECRET=<chuỗi ngẫu nhiên dài ít nhất 32 ký tự>
 
-# 2. Build và chạy trọn bộ (DB + migrate + app)
+# 2. Build và chạy trọn bộ (DB + migrate tự động + app)
 docker compose --profile prod up -d --build
 ```
 
-**Gieo dữ liệu ban đầu (chỉ lần đầu cài):** chọn 1 trong 2 cách:
+**Gieo dữ liệu ban đầu (chỉ lần đầu cài):** chọn 1 trong 2:
 
 ```powershell
-# Cách A — máy này có sẵn Node.js: chạy seed trỏ vào DB trong Docker
+# Cách A — máy có Node.js: chạy seed trỏ vào DB trong Docker
 $env:DATABASE_URL = "postgresql://hoadon:hoadon_dev_2026@localhost:5433/web_xuat_hoa_don?schema=public"
 npx prisma db seed
 
-# Cách B — phục hồi từ file backup của một máy khác (xem mục 4)
-
+# Cách B — phục hồi từ file backup của máy khác (xem mục 4)
+```
 
 - Máy chủ mở: `http://localhost:3000`
-- Máy khác trong cùng Wi-Fi: `http://<IP-máy-chủ>:3000` (xem IP bằng `ipconfig`)
+- Máy khác trong cùng Wi-Fi: `http://<IP-máy-chủ>:3000` (xem IP: `ipconfig`, dòng IPv4)
+
+**Cập nhật phiên bản mới:**
+```bash
+git pull
+docker compose --profile prod up -d --build   # migrate chạy tự động trước khi app lên
+```
 
 ---
 
 ## 3. Checklist máy-làm-server (bắt buộc trước khi dùng thật)
 
-- [ ] **Tắt chế độ Sleep**: Settings → System → Power → "When plugged in, put my device to sleep" → **Never**.
-- [ ] **Docker Desktop tự khởi động**: Docker Desktop → Settings → General → bật "Start Docker Desktop when you sign in".
-- [ ] Container có `restart: unless-stopped` — Docker bật lại là app tự chạy.
-- [ ] **Đăng ký backup hằng ngày** (chạy 1 lần, quyền Administrator):
+- [ ] **Tắt Sleep**: Settings → System → Power → "put my device to sleep" → **Never**.
+- [ ] **Docker Desktop tự khởi động**: Docker Desktop → Settings → General → "Start Docker Desktop when you sign in".
+- [ ] **Đăng ký backup tự động 21:00 hằng ngày** (chạy 1 lần, PowerShell quyền Administrator):
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts\dang-ky-backup-hang-ngay.ps1
   ```
-- [ ] **Đồng bộ thư mục `backups\` ra nơi thứ hai** (Google Drive/USB). Ổ cứng hỏng = mất toàn bộ hóa đơn nếu bỏ qua bước này.
-- [ ] Đặt IP tĩnh cho máy chủ trong router (để địa chỉ `http://<IP>:3000` không đổi).
-- [ ] Đổi toàn bộ mật khẩu mặc định của tài khoản mẫu.
+- [ ] **Đồng bộ thư mục `backups\` ra nơi thứ hai** (Google Drive/USB) — ổ cứng hỏng = mất toàn bộ hóa đơn nếu bỏ qua.
+- [ ] Đặt **IP tĩnh** cho máy chủ trong router.
+- [ ] Mở firewall cho máy khác trong LAN (PowerShell Admin):
+  ```powershell
+  New-NetFirewallRule -DisplayName "HoaDon" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+  ```
+- [ ] **Đổi toàn bộ mật khẩu mặc định**: đăng nhập admin → menu "Quản lý tài khoản" → Đặt lại mật khẩu từng tài khoản.
 
 ---
 
@@ -89,18 +109,41 @@ powershell -ExecutionPolicy Bypass -File scripts\backup-db.ps1
 
 **Phục hồi từ backup** (XÓA toàn bộ dữ liệu hiện tại — chắc chắn rồi mới chạy):
 ```powershell
-# Giải nén rồi nạp vào DB
 docker exec -i hoadon-db sh -c "dropdb -U hoadon web_xuat_hoa_don && createdb -U hoadon web_xuat_hoa_don"
 Get-Content backups\hoadon_<ten-file>.sql.gz -AsByteStream -Raw | docker exec -i hoadon-db sh -c "gunzip | psql -U hoadon web_xuat_hoa_don"
 ```
 
 ---
 
-## 5. Sự cố thường gặp
+## 5. Demo nhanh cho khách xem (ngrok — public tạm ra Internet)
+
+Khi muốn cho khách xem app đang chạy trên máy mình mà không cần VPS:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\demo-ngrok.ps1
+```
+
+Script sẽ: kiểm tra ngrok đã cài (in hướng dẫn cài nếu chưa) → kiểm tra app đang chạy → **nhắc đổi mật khẩu mặc định** → mở tunnel và in URL công khai dạng `https://xxxx.ngrok-free.app` để gửi khách.
+
+**Cài ngrok lần đầu (1 lần duy nhất):**
+1. `winget install ngrok.ngrok` (hoặc tải từ https://ngrok.com/download)
+2. Đăng ký tài khoản free tại https://dashboard.ngrok.com
+3. `ngrok config add-authtoken <token-của-bạn>`
+
+⚠️ **Giới hạn cần biết:**
+- Chỉ dùng **demo tạm thời** — đóng cửa sổ ngrok là link chết; bản free mỗi lần chạy ra URL khác.
+- Trong lúc demo, ai có URL đều thấy trang đăng nhập → **bắt buộc đổi mật khẩu mặc định trước**.
+- Muốn chạy thật qua Internet lâu dài → thuê VPS (xem `DANH-GIA-VA-LO-TRINH.md` Mục 0b), KHÔNG dùng ngrok.
+
+---
+
+## 6. Sự cố thường gặp
 
 | Hiện tượng | Nguyên nhân & cách xử lý |
 |---|---|
-| App báo "Đã xảy ra lỗi hệ thống" khi đăng nhập | DB chưa chạy. Kiểm tra `docker ps` — nếu không thấy `hoadon-db`, chạy `docker compose up -d db`. Docker Desktop có thể chưa bật. |
-| `Can't reach database server at localhost:5433` | Như trên — Docker Desktop tắt hoặc container chưa lên. |
-| Máy khác trong LAN không vào được | Windows Firewall chặn port 3000: mở PowerShell Admin → `New-NetFirewallRule -DisplayName "HoaDon" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow` |
-| Trùng port 5433 | Sửa port trong `docker-compose.yml` và `DATABASE_URL` trong `.env` cho khớp nhau. |
+| Đăng nhập báo "Đã xảy ra lỗi hệ thống" | DB chưa chạy. `docker ps` không thấy `hoadon-db` → `docker compose up -d db`. Docker Desktop có thể chưa bật. |
+| `Can't reach database server at localhost:5433` | Như trên. |
+| App không lên, port 3000 bận | Tiến trình node cũ còn giữ port: PowerShell Admin → `Get-NetTCPConnection -LocalPort 3000 \| % { Stop-Process -Id $_.OwningProcess -Force }` rồi chạy lại. |
+| Máy khác trong LAN không vào được | Firewall chưa mở port 3000 — xem mục 3. |
+| Sinh mã hóa đơn báo trùng (P2002) | Bộ đếm lệch do phục hồi backup cũ. Đồng bộ lại: xem SQL resync trong `CLAUDE.md` (bài học 03/07/2026). |
+| ngrok báo cần authtoken | Chưa chạy `ngrok config add-authtoken` — xem mục 5. |

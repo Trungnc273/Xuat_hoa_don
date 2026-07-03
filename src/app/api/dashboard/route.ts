@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { cached } from '@/server/cache';
 
 export async function GET(req: Request) {
   try {
@@ -8,6 +9,9 @@ export async function GET(req: Request) {
     if (!session) {
       return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
     }
+
+    // Cache 30s — số liệu tổng hợp không cần realtime tuyệt đối (SPEC GĐ4, FR-1)
+    const payload = await cached('dashboard', 30_000, async () => {
 
     // 1. Lấy số lượng và tổng số liệu cơ bản
     const totalCustomers = await prisma.customer.count();
@@ -194,7 +198,7 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({
+    return {
       counters: {
         totalRevenue,
         totalInvoices,
@@ -215,7 +219,10 @@ export async function GET(req: Request) {
         invoices: recentInvoices,
         quotations: recentQuotations,
       },
+    };
     });
+
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('Lỗi GET Dashboard:', error);
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
