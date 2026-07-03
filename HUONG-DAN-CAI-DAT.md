@@ -64,10 +64,21 @@ docker compose --profile prod up -d --build
 
 ```powershell
 # Cách A — máy có Node.js: chạy seed trỏ vào DB trong Docker
+# QUAN TRỌNG: phải npm install trước — nếu bỏ qua, seed sẽ báo lỗi hoặc
+# không tạo được tài khoản, dẫn tới đăng nhập báo "sai tài khoản/mật khẩu"
+# dù gõ đúng admin/admin123 (không có tài khoản nào trong DB để so khớp).
+npm install
+npx prisma generate
 $env:DATABASE_URL = "postgresql://hoadon:hoadon_dev_2026@localhost:5433/web_xuat_hoa_don?schema=public"
 npx prisma db seed
 
 # Cách B — phục hồi từ file backup của máy khác (xem mục 4)
+```
+
+**Kiểm tra seed đã chạy đúng chưa:**
+```powershell
+docker exec hoadon-db psql -U hoadon web_xuat_hoa_don -c "SELECT username FROM users;"
+# Phải thấy 4 dòng: admin, manager, accountant, staff. Nếu ra 0 dòng — chạy lại seed ở trên.
 ```
 
 - Máy chủ mở: `http://localhost:3000`
@@ -141,6 +152,7 @@ Script sẽ: kiểm tra ngrok đã cài (in hướng dẫn cài nếu chưa) →
 
 | Hiện tượng | Nguyên nhân & cách xử lý |
 |---|---|
+| Đăng nhập báo "Tài khoản hoặc mật khẩu không chính xác" dù gõ đúng `admin/admin123` | Chưa seed dữ liệu hoặc seed thất bại (thường do quên `npm install` trước khi chạy seed — xem mục 2). Kiểm tra: `docker exec hoadon-db psql -U hoadon web_xuat_hoa_don -c "SELECT username FROM users;"` — ra 0 dòng thì chạy lại seed. |
 | Đăng nhập báo "Đã xảy ra lỗi hệ thống" | DB chưa chạy. `docker ps` không thấy `hoadon-db` → `docker compose up -d db`. Docker Desktop có thể chưa bật. |
 | `Can't reach database server at localhost:5433` | Như trên. |
 | App không lên, port 3000 bận | Tiến trình node cũ còn giữ port: PowerShell Admin → `Get-NetTCPConnection -LocalPort 3000 \| % { Stop-Process -Id $_.OwningProcess -Force }` rồi chạy lại. |

@@ -75,6 +75,12 @@ Docker Desktop tự khởi động.
 - **03/07/2026 — Trộn 2 phiên bản code trên cùng DB làm lệch bộ đếm mã.** Ảnh cũ (count()+1) tạo chứng từ
   vượt xa `document_counters` → ảnh mới sinh mã trùng (P2002). Đã có sẵn SQL resync bộ đếm theo MAX(code)
   từng bảng (xem lịch sử chat 03/07 hoặc migration backfill làm mẫu) — chạy khi nghi ngờ lệch.
+- **03/07/2026 — Hướng dẫn cài prod bỏ sót `npm install` trước bước seed.** Khách hàng đầu tiên clone
+  repo, làm đúng `HUONG-DAN-CAI-DAT.md` nhưng chạy thẳng `npx prisma db seed` mà chưa `npm install` →
+  seed không tạo được tài khoản (bảng `users` rỗng), đăng nhập báo "sai tài khoản/mật khẩu" — dễ hiểu lầm
+  là lỗi app trong khi DB đơn giản là trống. **Bài học:** tài liệu hướng dẫn phải tự đủ điều kiện tiên
+  quyết ở từng bước, không giả định người đọc suy ra được; luôn kèm câu lệnh kiểm tra kết quả (ví dụ
+  `SELECT username FROM users`) ngay sau bước có thể âm thầm thất bại.
 
 ## Việc đang dang dở / điểm tiếp theo
 
