@@ -1,0 +1,29 @@
+# Chặn AI đọc các file không liên quan — giảm nhiễu ngữ cảnh, tiết kiệm token.
+# Không phải file bảo mật (đã có .gitignore lo phần đó) — đây chỉ để AI khỏi đọc rác.
+
+node_modules/
+.next/
+.git/
+package-lock.json
+
+# Build/output tạo tự động
+.next/dev/
+dist/
+build/
+
+# Log & dữ liệu nhị phân
+*.log
+backups/
+public/uploads/
+
+# File môi trường thật (AI không cần đọc giá trị secret để làm việc)
+.env
+.env.local
+.env.production
+
+# Ảnh/tài nguyên tĩnh dung lượng lớn — không cần đọc nội dung nhị phân
+public/**/*.png
+public/**/*.jpg
+public/**/*.jpeg
+public/**/*.ico
+public/**/*.svg

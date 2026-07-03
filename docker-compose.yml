@@ -1,0 +1,70 @@
+# ============================================================
+# Hạ tầng dự án Web Xuất Hóa Đơn
+#
+# DEV  (chỉ chạy DB, app chạy bằng `npm run dev`):
+#   docker compose up -d db
+#
+# PROD (chạy trọn bộ DB + migrate + app trong Docker):
+#   docker compose --profile prod up -d --build
+#   → mở http://localhost:3000 (hoặc http://<IP-máy-này>:3000 từ máy khác trong LAN)
+# ============================================================
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hoadon-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hoadon
+      POSTGRES_PASSWORD: hoadon_dev_2026
+      POSTGRES_DB: web_xuat_hoa_don
+    ports:
+      # Port 5433 phía máy thật (5432 đã bị dự án khác dùng)
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - hoadon_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hoadon -d web_xuat_hoa_don"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Chạy migration trước khi app khởi động (chỉ profile prod)
+  migrate:
+    profiles: ["prod"]
+    build:
+      context: .
+      target: builder
+    container_name: hoadon-migrate
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://hoadon:hoadon_dev_2026@db:5432/web_xuat_hoa_don?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    profiles: ["prod"]
+    build:
+      context: .
+      target: runner
+    container_name: hoadon-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://hoadon:hoadon_dev_2026@db:5432/web_xuat_hoa_don?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Phải đặt JWT_SECRET trong file .env}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    ports:
+      # 0.0.0.0 để máy khác trong mạng LAN truy cập được
+      - "3000:3000"
+    volumes:
+      # Giữ file upload khi container bị xóa/tạo lại
+      - hoadon_uploads:/app/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  hoadon_pgdata:
+  hoadon_uploads:
