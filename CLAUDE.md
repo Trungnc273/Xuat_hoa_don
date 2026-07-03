@@ -59,9 +59,19 @@ Docker Desktop tự khởi động.
 - **02/07/2026 — `npm run dev` treo tiến trình cũ vẫn giữ cổng 3000 sau khi "tắt".** Khi chuyển từ dev sang
   chạy Docker prod, phải chủ động kill process node cũ trước, không chỉ dừng background task trong tool.
 
+- **03/07/2026 — Sinh mã tuần tự hóa transaction → phải nới maxWait/timeout.** Khi chuyển sinh mã vào
+  transaction (khóa row bộ đếm), 10 request đồng thời xếp hàng tuần tự; Prisma mặc định chỉ chờ 2s để vào
+  transaction nên 3 request cuối fail "Unable to start a transaction". Giải pháp: `{ maxWait: 10000,
+  timeout: 20000 }` cho các transaction nặng (tạo hóa đơn, convert). **Bài học:** thêm khóa tuần tự thì
+  phải nghĩ ngay đến hàng đợi phía sau nó.
+
 ## Việc đang dang dở / điểm tiếp theo
 
 - Giai đoạn 0 (nền tảng vận hành) đã xong: Docker hóa, backup, hướng dẫn cài đặt.
-- **Đang chờ bắt đầu Giai đoạn 1**: vá 3 lỗi nghiêm trọng — xem SPEC tương ứng tại
-  `docs/specs/2026-07-gd1-va-loi-nghiem-trong/SPEC.md`.
+- **Giai đoạn 1 đã xong (03/07/2026)**: vá 3 lỗi nghiêm trọng + lỗi G (JWT_SECRET) + lỗi H (nuốt lỗi sinh mã).
+  Kiểm chứng 10/10 PASS bằng `scripts/verify-gd1.mjs`. Nghiệp vụ đã chốt: cho phép bán âm kho (cảnh báo,
+  không chặn); convert báo giá có trừ kho.
+- **Tiếp theo: Giai đoạn 2** — phân tầng Service + Zod validation + `organizationId` + chuyển middleware →
+  proxy (Next 16 deprecated middleware). Cần viết SPEC mới theo template trước khi làm.
 - Vai trò hệ thống hiện dùng: ADMIN, MANAGER, ACCOUNTANT, STAFF (đã xác nhận đúng nhu cầu người dùng).
+- Git: repo https://github.com/Trungnc273/Xuat_hoa_don (private), quy ước mỗi task một commit.

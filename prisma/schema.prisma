@@ -339,3 +339,11 @@ model ActivityLog {
 
   @@map("activity_logs")
 }
+
+// Bộ đếm mã chứng từ — sinh mã atomic trong transaction, thay cho count()+1 (xem SPEC GĐ1, FR-2)
+model DocumentCounter {
+  prefix     String @id // HD, BG, PT, PC, SP, KH, NCC, KHO, CP
+  lastNumber Int    @default(0)
+
+  @@map("document_counters")
+}

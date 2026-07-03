@@ -1,6 +1,6 @@
 # SPEC — Giai đoạn 1: Vá lỗi nghiêm trọng
 
-> Trạng thái: **Chờ duyệt** (chưa thực thi). Đọc cùng `CONTEXT.md` trong thư mục này và `CONSTITUTION.md`
+> Trạng thái: **Hoàn thành** (03/07/2026 — 10/10 tiêu chí PASS bằng scripts/verify-gd1.mjs). Đọc cùng `CONTEXT.md` trong thư mục này và `CONSTITUTION.md`
 > ở gốc dự án. Sau khi người dùng duyệt SPEC này, AI mới được viết `PLAN.md` rồi `TASKS.md`.
 
 ## 1. Bối cảnh
@@ -77,19 +77,19 @@ app "trông như đúng" trong test thông thường nhưng sai ở production.
 
 ## 7. Tiêu chí chấp nhận (Acceptance Criteria)
 
-- [ ] Đăng nhập bằng tài khoản `staff` (seed có sẵn) → `GET /api/auth/me` trả `role: "STAFF"` (không phải
+- [x] Đăng nhập bằng tài khoản `staff` (seed có sẵn) → `GET /api/auth/me` trả `role: "STAFF"` (không phải
       `"ADMIN"`).
-- [ ] Tài khoản `staff` gọi `POST /api/receipts` → nhận HTTP 403 (STAFF không có trong danh sách được lập
+- [x] Tài khoản `staff` gọi `POST /api/receipts` → nhận HTTP 403 (STAFF không có trong danh sách được lập
       phiếu thu).
-- [ ] Tài khoản `staff` gọi `GET /api/invoices` → chỉ thấy hóa đơn do chính `staff` tạo.
-- [ ] Viết script/test tạo 10 hóa đơn đồng thời (Promise.all) → 10 mã sinh ra khác nhau hoàn toàn, không
+- [x] Tài khoản `staff` gọi `GET /api/invoices` → chỉ thấy hóa đơn do chính `staff` tạo.
+- [x] Viết script/test tạo 10 hóa đơn đồng thời (Promise.all) → 10 mã sinh ra khác nhau hoàn toàn, không
       lỗi unique constraint.
-- [ ] Tạo hóa đơn với sản phẩm có tồn kho = 5, số lượng đặt = 8 → thành công, tồn kho mới = −3,
+- [x] Tạo hóa đơn với sản phẩm có tồn kho = 5, số lượng đặt = 8 → thành công, tồn kho mới = −3,
       `StockMovement` ghi `prevStock: 5, newStock: -3`, response có `stockWarnings` nêu sản phẩm này.
-- [ ] Tạo hóa đơn với số lượng ≤ tồn kho → thành công, tồn kho trừ đúng, không có `stockWarnings`.
-- [ ] Chuyển báo giá (có sản phẩm thực) thành hóa đơn → tồn kho bị trừ + có `StockMovement`, giống hệt
+- [x] Tạo hóa đơn với số lượng ≤ tồn kho → thành công, tồn kho trừ đúng, không có `stockWarnings`.
+- [x] Chuyển báo giá (có sản phẩm thực) thành hóa đơn → tồn kho bị trừ + có `StockMovement`, giống hệt
       tạo hóa đơn trực tiếp.
-- [ ] Toàn bộ acceptance criteria trên được xác minh bằng lệnh `curl`/script thật, không chỉ đọc code.
+- [x] Toàn bộ acceptance criteria trên được xác minh bằng lệnh `curl`/script thật, không chỉ đọc code.
 
 ## 8. Ngoài phạm vi (Out of Scope)
 

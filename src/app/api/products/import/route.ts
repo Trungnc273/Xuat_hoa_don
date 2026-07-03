@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // POST: Nhập khẩu sản phẩm hàng loạt từ Excel
 export async function POST(req: Request) {
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         }
 
         // 3. Tự sinh mã SP
-        const code = await generateDocumentCode('SP', 'product');
+        const code = await generateDocumentCode(tx, 'SP');
 
         // 4. Lưu sản phẩm
         const qty = stock ? parseInt(stock) : 0;

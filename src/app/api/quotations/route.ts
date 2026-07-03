@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Danh sách báo giá
 export async function GET(req: Request) {
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
 
     // Chạy trong transaction
     const quotation = await prisma.$transaction(async (tx) => {
-      const code = await generateDocumentCode('BG', 'quotation');
+      const code = await generateDocumentCode(tx, 'BG');
 
       return tx.quotation.create({
         data: {

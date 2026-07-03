@@ -1,11 +1,14 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  // Thiếu secret = mọi token có thể bị giả mạo. Từ chối chạy thay vì âm thầm dùng giá trị mặc định.
-  throw new Error('Thiếu biến môi trường JWT_SECRET — xem HUONG-DAN-CAI-DAT.md mục 1.');
-}
+// Thiếu secret = mọi token có thể bị giả mạo. Từ chối chạy thay vì âm thầm dùng giá trị mặc định.
+const JWT_SECRET: string = (() => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('Thiếu biến môi trường JWT_SECRET — xem HUONG-DAN-CAI-DAT.md mục 1.');
+  }
+  return secret;
+})();
 
 /**
  * Băm mật khẩu người dùng

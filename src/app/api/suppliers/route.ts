@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách nhà cung cấp
 export async function GET(req: Request) {
@@ -76,9 +76,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Tên nhà cung cấp là bắt buộc' }, { status: 400 });
     }
 
-    const code = await generateDocumentCode('NCC', 'supplier');
-
-    const supplier = await prisma.supplier.create({
+    const supplier = await prisma.$transaction(async (tx) => {
+      const code = await generateDocumentCode(tx, 'NCC');
+      return tx.supplier.create({
       data: {
         code,
         name,
@@ -90,6 +90,7 @@ export async function POST(req: Request) {
         contactPerson,
         note,
       },
+      });
     });
 
     // Ghi nhật ký

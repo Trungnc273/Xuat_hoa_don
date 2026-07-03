@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách sản phẩm
 export async function GET(req: Request) {
@@ -84,11 +84,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Vui lòng nhập đầy đủ thông tin bắt buộc: tên, giá nhập, giá bán' }, { status: 400 });
     }
 
-    // Tự sinh mã sản phẩm
-    const code = await generateDocumentCode('SP', 'product');
-
     // Chạy trong Prisma Transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Tự sinh mã sản phẩm (atomic trong transaction)
+      const code = await generateDocumentCode(tx, 'SP');
       // 1. Tạo sản phẩm
       const product = await tx.product.create({
         data: {

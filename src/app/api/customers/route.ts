@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách khách hàng (có tìm kiếm, phân trang, sắp xếp)
 export async function GET(req: Request) {
@@ -81,10 +81,9 @@ export async function POST(req: Request) {
     }
 
     // Tự động sinh mã khách hàng (ví dụ KH000001)
-    const code = await generateDocumentCode('KH', 'customer');
-
-    // Lưu vào database
-    const customer = await prisma.customer.create({
+    const customer = await prisma.$transaction(async (tx) => {
+      const code = await generateDocumentCode(tx, 'KH');
+      return tx.customer.create({
       data: {
         code,
         name,
@@ -96,6 +95,7 @@ export async function POST(req: Request) {
         contactPerson,
         note,
       },
+      });
     });
 
     // Ghi nhật ký

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Danh sách phiếu thu
 export async function GET(req: Request) {
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
       }
 
       // B. Sinh mã phiếu thu
-      const receiptCode = await generateDocumentCode('PT', 'receipt');
+      const receiptCode = await generateDocumentCode(tx, 'PT');
 
       // C. Tạo phiếu thu
       const receipt = await tx.receipt.create({

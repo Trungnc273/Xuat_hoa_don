@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // GET: Lấy danh sách kho hàng
 export async function GET(req: Request) {
@@ -41,15 +41,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Tên kho hàng là bắt buộc' }, { status: 400 });
     }
 
-    const code = await generateDocumentCode('KHO', 'warehouse');
-
-    const warehouse = await prisma.warehouse.create({
+    const warehouse = await prisma.$transaction(async (tx) => {
+      const code = await generateDocumentCode(tx, 'KHO');
+      return tx.warehouse.create({
       data: {
         code,
         name,
         address,
         description,
       },
+      });
     });
 
     // Ghi nhật ký

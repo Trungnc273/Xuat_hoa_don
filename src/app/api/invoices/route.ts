@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Danh sách hóa đơn (có phân trang, lọc trạng thái, tìm kiếm)
 export async function GET(req: Request) {
@@ -125,22 +125,8 @@ export async function POST(req: Request) {
       };
     });
 
-    // 2. Sinh mã QR VietQR động
+    // 2. Đọc cài đặt ngân hàng (QR sinh trong transaction, sau khi có mã hóa đơn thật)
     const setting = await prisma.setting.findFirst();
-    let qrCodeUrl = '';
-    const invoiceCode = await generateDocumentCode('HD', 'invoice');
-
-    if (setting && setting.bankAccount) {
-      const parts = setting.bankAccount.split('-');
-      if (parts.length >= 3) {
-        const bankBin = parts[0].trim();
-        const accountNo = parts[1].trim();
-        const accountName = encodeURIComponent(parts[2].trim());
-        const addInfo = encodeURIComponent(`Thanh toan hoa don ${invoiceCode}`);
-        
-        qrCodeUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${total}&addInfo=${addInfo}&accountName=${accountName}`;
-      }
-    }
 
     // Lấy kho chính phục vụ xuất kho
     let defaultWh = await prisma.warehouse.findFirst();
@@ -155,7 +141,24 @@ export async function POST(req: Request) {
     }
 
     // 3. Thực hiện trong transaction
+    const stockWarnings: { productId: string; productName: string; newStock: number }[] = [];
     const invoice = await prisma.$transaction(async (tx) => {
+      // Sinh mã hóa đơn atomic (SPEC GĐ1, FR-2)
+      const invoiceCode = await generateDocumentCode(tx, 'HD');
+
+      // Sinh QR VietQR động theo mã thật
+      let qrCodeUrl = '';
+      if (setting && setting.bankAccount) {
+        const parts = setting.bankAccount.split('-');
+        if (parts.length >= 3) {
+          const bankBin = parts[0].trim();
+          const accountNo = parts[1].trim();
+          const accountName = encodeURIComponent(parts[2].trim());
+          const addInfo = encodeURIComponent(`Thanh toan hoa don ${invoiceCode}`);
+          qrCodeUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${total}&addInfo=${addInfo}&accountName=${accountName}`;
+        }
+      }
+
       // A. Tạo hóa đơn
       const createdInvoice = await tx.invoice.create({
         data: {
@@ -191,8 +194,8 @@ export async function POST(req: Request) {
 
           if (product) {
             const prevStock = product.stock;
-            // Chỉ trừ kho đối với hàng hóa thực tế (không trừ nợ âm nếu không cho phép, nhưng ở đây trừ kho bình thường)
-            const newStock = Math.max(0, prevStock - item.quantity);
+            // Tồn kho phải trung thực: cho phép âm (bán trước nhập sau), cấm cắt về 0 (SPEC GĐ1, FR-3)
+            const newStock = prevStock - item.quantity;
 
             // Cập nhật tồn kho sản phẩm
             await tx.product.update({
@@ -200,7 +203,7 @@ export async function POST(req: Request) {
               data: { stock: newStock },
             });
 
-            // Ghi nhận xuất kho
+            // Ghi nhận xuất kho với số liệu thật
             await tx.stockMovement.create({
               data: {
                 type: 'OUT',
@@ -209,16 +212,21 @@ export async function POST(req: Request) {
                 prevStock,
                 newStock,
                 warehouseId: defaultWh.id,
-                reason: `Xuất kho bán hàng theo hóa đơn ${invoiceCode}`,
+                reason: `Xuất kho bán hàng theo hóa đơn ${createdInvoice.code}`,
                 createdBy: session.username,
               },
             });
+
+            // Cảnh báo cho người bán biết cần nhập bù
+            if (newStock < 0) {
+              stockWarnings.push({ productId: product.id, productName: product.name, newStock });
+            }
           }
         }
       }
 
       return createdInvoice;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     // Ghi nhật ký hệ thống
     await prisma.activityLog.create({
@@ -231,7 +239,12 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ message: 'Tạo hóa đơn thành công', invoice });
+    return NextResponse.json({
+      message: 'Tạo hóa đơn thành công',
+      invoice,
+      // Danh sách sản phẩm bị âm kho sau giao dịch (nếu có) — FE nên hiển thị cảnh báo nhập bù
+      stockWarnings,
+    });
   } catch (error) {
     console.error('Lỗi POST Invoice:', error);
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });

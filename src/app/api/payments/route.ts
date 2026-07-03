@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách phiếu chi
 export async function GET(req: Request) {
@@ -79,9 +79,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Số tiền chi phải lớn hơn 0' }, { status: 400 });
     }
 
-    const paymentCode = await generateDocumentCode('PC', 'payment');
-
-    const payment = await prisma.payment.create({
+    const payment = await prisma.$transaction(async (tx) => {
+      const paymentCode = await generateDocumentCode(tx, 'PC');
+      return tx.payment.create({
       data: {
         code: paymentCode,
         supplierId: supplierId || null,
@@ -94,6 +94,7 @@ export async function POST(req: Request) {
       include: {
         supplier: true,
       },
+      });
     });
 
     // Ghi nhật ký hệ thống

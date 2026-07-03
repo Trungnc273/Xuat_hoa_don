@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // 1. GET: Lấy danh sách chi phí khác
 export async function GET(req: Request) {
@@ -80,9 +80,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Vui lòng cung cấp tiêu đề, danh mục và số tiền lớn hơn 0' }, { status: 400 });
     }
 
-    const expenseCode = await generateDocumentCode('CP', 'expense');
-
-    const expense = await prisma.expense.create({
+    const expense = await prisma.$transaction(async (tx) => {
+      const expenseCode = await generateDocumentCode(tx, 'CP');
+      return tx.expense.create({
       data: {
         code: expenseCode,
         title,
@@ -92,6 +92,7 @@ export async function POST(req: Request) {
         payorId: session.userId,
         note,
       },
+      });
     });
 
     // Ghi nhật ký hệ thống

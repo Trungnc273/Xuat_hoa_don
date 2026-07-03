@@ -158,19 +158,19 @@ PostgreSQL (DB)  +  Cache (đọc nhiều)  +  Lưu trữ file (uploads)
 ## 6. Lộ trình đưa lên MVP (5 giai đoạn)
 
 ### Giai đoạn 0 — Dựng lại nền tảng vận hành (làm TRƯỚC khi sửa bất kỳ dòng code nào)
-- [ ] Chạy thử app hiện tại từ đầu (cài DB, migrate, seed, đăng nhập) → xác nhận build/chạy được, chụp lại hiện trạng làm mốc so sánh.
-- [ ] Viết `HUONG-DAN-CAI-DAT.md`: dựng môi trường từ số 0 (dành cho người mới nhận dự án).
-- [ ] Đóng gói Docker: `Dockerfile` + `docker-compose.yml` (app + PostgreSQL) — nền cho mọi lần cài về sau.
-- [ ] **Backup tự động**: script sao lưu PostgreSQL hằng ngày ra thư mục thứ hai (USB/Google Drive). *Điều kiện sống còn khi chạy trên máy cá nhân.*
-- [ ] Checklist máy-làm-server: tắt sleep, Docker tự khởi động cùng máy.
+- [x] Chạy thử app hiện tại từ đầu (cài DB, migrate, seed, đăng nhập) → xác nhận build/chạy được, chụp lại hiện trạng làm mốc so sánh.
+- [x] Viết `HUONG-DAN-CAI-DAT.md`: dựng môi trường từ số 0 (dành cho người mới nhận dự án).
+- [x] Đóng gói Docker: `Dockerfile` + `docker-compose.yml` (app + PostgreSQL) — nền cho mọi lần cài về sau.
+- [x] **Backup tự động**: script sao lưu PostgreSQL hằng ngày ra thư mục thứ hai (USB/Google Drive). *Điều kiện sống còn khi chạy trên máy cá nhân.*
+- [x] Checklist máy-làm-server (tài liệu xong; 2 việc tay: đăng ký task backup + đồng bộ backups ra nơi thứ hai): tắt sleep, Docker tự khởi động cùng máy.
 > Kết thúc GĐ0: dự án **dựng lại được ở bất kỳ máy nào trong 15 phút, dữ liệu không thể mất trắng**.
 
 ### Giai đoạn 1 — Vá lỗi nghiêm trọng (ưu tiên tuyệt đối)
-- [ ] Sửa `verifyJWT` để trả **đúng vai trò thật** từ token (bỏ `role: 'ADMIN'` cứng) — mục A.
-- [ ] Bỏ hardcode `role: 'ADMIN'` ở login & me.
-- [ ] Thay bộ sinh mã chứng từ bằng cơ chế an toàn (sequence/transaction) — mục B.
-- [ ] Chặn bán vượt tồn kho (báo lỗi rõ ràng khi không đủ hàng) — mục C.
-- [ ] Bắt buộc `JWT_SECRET` từ env, bỏ fallback — mục G.
+- [x] Sửa `verifyJWT` để trả **đúng vai trò thật** từ token (bỏ `role: 'ADMIN'` cứng) — mục A.
+- [x] Bỏ hardcode `role: 'ADMIN'` ở login & me.
+- [x] Thay bộ sinh mã chứng từ bằng cơ chế an toàn (sequence/transaction) — mục B.
+- [x] Tồn kho trung thực: cho phép bán âm + cảnh báo, cấm cắt số liệu (đổi thiết kế 03/07/2026 theo quyết định chủ dự án) — mục C.
+- [x] Bắt buộc `JWT_SECRET` từ env, bỏ fallback — mục G.
 > Kết thúc GĐ1: app **an toàn để dùng thật với dữ liệu thật**.
 
 ### Giai đoạn 2 — Chuẩn hóa kiến trúc nền

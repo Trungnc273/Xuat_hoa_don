@@ -1,6 +1,6 @@
 # PLAN — Giai đoạn 1: Vá lỗi nghiêm trọng
 
-> Trạng thái: **Chờ duyệt**. Sinh từ `SPEC.md` ngày 03/07/2026. Đã tự đối chiếu với `CONSTITUTION.md`
+> Trạng thái: **Hoàn thành** (03/07/2026). Đáp án câu hỏi Mục 6: (1) Phương án A — convert CÓ trừ kho; (2) CHO PHÉP bán âm kho (mọi vai trò), ghi số liệu trung thực + cảnh báo. Sinh từ `SPEC.md` ngày 03/07/2026. Đã tự đối chiếu với `CONSTITUTION.md`
 > (không phát hiện xung đột — chi tiết ở Mục 5). Sau khi duyệt PLAN, AI sinh `TASKS.md` rồi mới sửa code.
 
 ## 1. Cách tiếp cận theo từng yêu cầu

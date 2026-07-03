@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/utils';
+import { generateDocumentCode } from '@/lib/codegen';
 
 // POST: Chuyển đổi báo giá thành hóa đơn
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,29 +33,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Đọc cài đặt ngân hàng của doanh nghiệp để sinh VietQR
     const setting = await prisma.setting.findFirst();
-    let qrCodeUrl = '';
-
-    if (setting && setting.bankAccount) {
-      // bankAccount có định dạng: "VCB - 1012999999 - CONG TY..."
-      const parts = setting.bankAccount.split('-');
-      if (parts.length >= 3) {
-        const bankBin = parts[0].trim();
-        const accountNo = parts[1].trim();
-        const accountName = encodeURIComponent(parts[2].trim());
-        const amount = quotation.total;
-        
-        // Tạo mã hóa đơn tự động tiếp theo để gán vào nội dung chuyển khoản
-        const nextInvoiceCode = await generateDocumentCode('HD', 'invoice');
-        const addInfo = encodeURIComponent(`Thanh toan hoa don ${nextInvoiceCode}`);
-
-        // Sinh link VietQR động
-        qrCodeUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${amount}&addInfo=${addInfo}&accountName=${accountName}`;
-      }
+    // Lấy kho chính phục vụ xuất kho (giống luồng tạo hóa đơn trực tiếp)
+    let defaultWh = await prisma.warehouse.findFirst();
+    if (!defaultWh) {
+      defaultWh = await prisma.warehouse.create({
+        data: {
+          code: 'KHO000001',
+          name: 'Kho trung tâm',
+          description: 'Kho mặc định của hệ thống',
+        },
+      });
     }
 
     // Thực hiện transaction
+    const stockWarnings: { productId: string; productName: string; newStock: number }[] = [];
     const invoice = await prisma.$transaction(async (tx) => {
-      const invoiceCode = await generateDocumentCode('HD', 'invoice');
+      // Sinh mã hóa đơn atomic — chỉ 1 lần, trong transaction (SPEC GĐ1, FR-2)
+      const invoiceCode = await generateDocumentCode(tx, 'HD');
+
+      // Sinh QR VietQR theo mã thật
+      let qrCodeUrl = '';
+      if (setting && setting.bankAccount) {
+        // bankAccount có định dạng: "VCB - 1012999999 - CONG TY..."
+        const parts = setting.bankAccount.split('-');
+        if (parts.length >= 3) {
+          const bankBin = parts[0].trim();
+          const accountNo = parts[1].trim();
+          const accountName = encodeURIComponent(parts[2].trim());
+          const addInfo = encodeURIComponent(`Thanh toan hoa don ${invoiceCode}`);
+          qrCodeUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${quotation.total}&addInfo=${addInfo}&accountName=${accountName}`;
+        }
+      }
 
       // 1. Tạo hóa đơn
       const newInvoice = await tx.invoice.create({
@@ -93,14 +101,49 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       });
 
-      // 2. Cập nhật trạng thái báo giá thành CONVERTED
+      // 2. Trừ kho + ghi StockMovement giống hệt tạo hóa đơn trực tiếp (SPEC GĐ1, FR-3 —
+      //    trước đây luồng convert không trừ kho, gây sai tồn)
+      for (const item of quotation.items) {
+        if (item.productId) {
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (product) {
+            const prevStock = product.stock;
+            // Tồn kho trung thực: cho phép âm, cấm cắt về 0
+            const newStock = prevStock - item.quantity;
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: newStock },
+            });
+
+            await tx.stockMovement.create({
+              data: {
+                type: 'OUT',
+                productId: item.productId,
+                quantity: item.quantity,
+                prevStock,
+                newStock,
+                warehouseId: defaultWh.id,
+                reason: `Xuất kho bán hàng theo hóa đơn ${invoiceCode} (chuyển từ báo giá ${quotation.code})`,
+                createdBy: session.username,
+              },
+            });
+
+            if (newStock < 0) {
+              stockWarnings.push({ productId: product.id, productName: product.name, newStock });
+            }
+          }
+        }
+      }
+
+      // 3. Cập nhật trạng thái báo giá thành CONVERTED
       await tx.quotation.update({
         where: { id: quotation.id },
         data: { status: 'CONVERTED' },
       });
 
       return newInvoice;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     // Ghi nhật ký
     await prisma.activityLog.create({
@@ -116,6 +159,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       message: 'Chuyển đổi báo giá thành hóa đơn thành công',
       invoice,
+      // Danh sách sản phẩm bị âm kho sau giao dịch (nếu có) — FE nên hiển thị cảnh báo nhập bù
+      stockWarnings,
     });
   } catch (error) {
     console.error('Lỗi chuyển đổi báo giá:', error);
