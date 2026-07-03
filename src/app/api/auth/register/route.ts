@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { registerSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
-    const { username, email, password, roleName } = await req.json();
+    const { username, email, password, roleName } = registerSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
 
     if (!username || !email || !password) {
       return NextResponse.json(
@@ -83,7 +85,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: any) {
-    console.error('Lỗi API Đăng ký:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('API Đăng ký', error);
   }
 }

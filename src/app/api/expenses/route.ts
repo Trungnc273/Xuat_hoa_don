@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { createExpenseSchema } from '@/server/validators/sales';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
@@ -72,10 +74,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = createExpenseSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { title, category, amount, date, note } = body;
 
-    const expAmount = parseFloat(amount);
+    const expAmount = amount;
     if (!title || !category || !expAmount || expAmount <= 0) {
       return NextResponse.json({ error: 'Vui lòng cung cấp tiêu đề, danh mục và số tiền lớn hơn 0' }, { status: 400 });
     }
@@ -108,7 +110,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Tạo chi phí thành công', expense });
   } catch (error) {
-    console.error('Lỗi POST Expense:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Expense', error);
   }
 }

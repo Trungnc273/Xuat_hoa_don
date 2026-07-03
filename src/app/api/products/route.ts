@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { createProductSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
@@ -60,8 +62,7 @@ export async function GET(req: Request) {
       },
     });
   } catch (error) {
-    console.error('Lỗi GET Products:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('GET Products', error);
   }
 }
 
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = createProductSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { sku, barcode, name, categoryId, importPrice, salePrice, vatRate, unit, images, description, stock } = body;
 
     if (!name || importPrice === undefined || salePrice === undefined) {
@@ -96,18 +97,18 @@ export async function POST(req: Request) {
           barcode: barcode || null,
           name,
           categoryId: categoryId || null,
-          importPrice: parseFloat(importPrice),
-          salePrice: parseFloat(salePrice),
-          vatRate: parseFloat(vatRate || 10),
+          importPrice: importPrice,
+          salePrice: salePrice,
+          vatRate: vatRate,
           unit: unit || 'Cái',
           images: images || [],
           description,
-          stock: stock ? parseInt(stock) : 0,
+          stock: stock,
         },
       });
 
       // 2. Nếu tồn kho khởi tạo > 0, tạo StockMovement và ghi vào kho chính mặc định
-      const initialStock = stock ? parseInt(stock) : 0;
+      const initialStock = stock;
       if (initialStock > 0) {
         // Lấy kho chính mặc định, nếu chưa có thì tạo mới
         let defaultWh = await tx.warehouse.findFirst();

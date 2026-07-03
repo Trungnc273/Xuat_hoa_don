@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { stockAdjustSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 
@@ -15,14 +17,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = stockAdjustSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { productId, warehouseId, type, quantity, reason, note } = body;
 
     if (!productId || !warehouseId || !type || quantity === undefined) {
       return NextResponse.json({ error: 'Thiếu thông tin bắt buộc: productId, warehouseId, type, quantity' }, { status: 400 });
     }
 
-    const qtyValue = parseInt(quantity);
+    const qtyValue = quantity;
     if (isNaN(qtyValue)) {
       return NextResponse.json({ error: 'Số lượng phải là một số nguyên' }, { status: 400 });
     }
@@ -103,7 +105,6 @@ export async function POST(req: Request) {
       movement: result.movement,
     });
   } catch (error: any) {
-    console.error('Lỗi POST Stock Adjust:', error);
-    return NextResponse.json({ error: error.message || 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Stock Adjust', error);
   }
 }

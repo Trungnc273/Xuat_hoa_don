@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { createQuotationSchema } from '@/server/validators/sales';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = createQuotationSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { customerId, dueDate, notes, items } = body;
 
     if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
@@ -166,7 +168,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Tạo báo giá thành công', quotation });
   } catch (error) {
-    console.error('Lỗi POST Quotation:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Quotation', error);
   }
 }

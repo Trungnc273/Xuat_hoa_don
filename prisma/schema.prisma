@@ -8,6 +8,7 @@ generator client {
 }
 
 model User {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String         @id @default(uuid())
   username      String         @unique
   email         String         @unique
@@ -62,6 +63,7 @@ model RolePermission {
 }
 
 model Customer {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String      @id @default(uuid())
   code          String      @unique // KH000001
   name          String
@@ -82,6 +84,7 @@ model Customer {
 }
 
 model Supplier {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String    @id @default(uuid())
   code          String    @unique // NCC000001
   name          String
@@ -111,6 +114,7 @@ model Category {
 }
 
 model Product {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id             String          @id @default(uuid())
   sku            String?         @unique
   code           String          @unique // SP000001
@@ -133,6 +137,7 @@ model Product {
 }
 
 model Warehouse {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id             String          @id @default(uuid())
   code           String          @unique // KHO000001
   name           String
@@ -164,6 +169,7 @@ model StockMovement {
 }
 
 model Quotation {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id             String          @id @default(uuid())
   code           String          @unique // BG000001
   customerId     String
@@ -203,6 +209,7 @@ model QuotationItem {
 }
 
 model Invoice {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id              String        @id @default(uuid())
   code            String        @unique // HD000001
   quotationId     String?
@@ -247,6 +254,7 @@ model InvoiceItem {
 }
 
 model Receipt {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String    @id @default(uuid())
   code          String    @unique // PT000001
   invoiceId     String?
@@ -266,6 +274,7 @@ model Receipt {
 }
 
 model Payment {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String    @id @default(uuid())
   code          String    @unique // PC000001
   supplierId    String?
@@ -283,6 +292,7 @@ model Payment {
 }
 
 model Expense {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id            String   @id @default(uuid())
   code          String   @unique // CP000001
   title         String
@@ -299,6 +309,7 @@ model Expense {
 }
 
 model Setting {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
   id             String   @id @default(uuid())
   logo           String?
   companyName    String
@@ -346,4 +357,14 @@ model DocumentCounter {
   lastNumber Int    @default(0)
 
   @@map("document_counters")
+}
+
+// Tổ chức/doanh nghiệp — 'để cửa' cho multi-tenant tương lai (ADR-002). Chưa có logic sử dụng.
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organizations")
 }

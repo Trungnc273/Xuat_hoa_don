@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { createPaymentSchema } from '@/server/validators/sales';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
@@ -71,10 +73,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = createPaymentSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { supplierId, amount, date, paymentMethod, note } = body;
 
-    const payAmount = parseFloat(amount);
+    const payAmount = amount;
     if (!payAmount || payAmount <= 0) {
       return NextResponse.json({ error: 'Số tiền chi phải lớn hơn 0' }, { status: 400 });
     }
@@ -110,7 +112,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Tạo phiếu chi thành công', payment });
   } catch (error) {
-    console.error('Lỗi POST Payment:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Payment', error);
   }
 }

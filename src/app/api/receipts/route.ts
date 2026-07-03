@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/codegen';
+import { requireAuth } from '@/server/auth';
+import { handleError, fail } from '@/server/http';
+import { logActivity } from '@/server/activity-log';
+import { createReceiptSchema } from '@/server/validators/sales';
+import { createReceipt } from '@/server/services/receipt.service';
+import { BusinessError } from '@/server/services/quotation.service';
 
 // 1. GET: Danh sách phiếu thu
 export async function GET(req: Request) {
@@ -63,105 +68,26 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. POST: Tạo phiếu thu (Cập nhật công nợ hóa đơn tương ứng)
+// 2. POST: Tạo phiếu thu (Route mỏng: auth → validate → service → response)
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
-
     // Chỉ Admin, Manager hoặc Kế toán được lập phiếu thu
-    if (!['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const auth = await requireAuth(req, ['ADMIN', 'MANAGER', 'ACCOUNTANT']);
+    if (!auth.ok) return auth.response;
 
-    const body = await req.json();
-    const { invoiceId, customerId, amount, date, paymentMethod, note } = body;
+    const input = createReceiptSchema.parse(await req.json());
+    const receipt = await createReceipt(auth.session, input);
 
-    const payAmount = parseFloat(amount);
-    if (!payAmount || payAmount <= 0) {
-      return NextResponse.json({ error: 'Số tiền thu phải lớn hơn 0' }, { status: 400 });
-    }
+    await logActivity(
+      auth.session,
+      'CREATE_RECEIPT',
+      `Lập phiếu thu tiền: ${receipt.code} (Số tiền: ${receipt.amount} VND, Khách hàng: ${receipt.customer?.name || 'Vãng lai'}, Hình thức: ${receipt.paymentMethod})`,
+      req
+    );
 
-    // Thực hiện tạo phiếu thu và cập nhật hóa đơn trong transaction
-    const result = await prisma.$transaction(async (tx) => {
-      let finalCustomerId = customerId;
-
-      // A. Nếu có hóa đơn, lấy customerId từ hóa đơn và cập nhật trạng thái hóa đơn
-      if (invoiceId) {
-        const invoice = await tx.invoice.findUnique({
-          where: { id: invoiceId },
-        });
-
-        if (!invoice) {
-          throw new Error('Không tìm thấy hóa đơn liên kết');
-        }
-
-        if (invoice.status === 'CANCELLED') {
-          throw new Error('Không thể thu tiền cho hóa đơn đã hủy');
-        }
-
-        finalCustomerId = invoice.customerId;
-
-        // Tính số tiền đã thanh toán mới
-        const newPaidAmount = invoice.paidAmount + payAmount;
-        const newRemainingAmount = Math.max(0, invoice.total - newPaidAmount);
-        
-        let newStatus = 'PARTIALLY_PAID';
-        if (newRemainingAmount <= 0) {
-          newStatus = 'PAID';
-        }
-
-        // Cập nhật lại số tiền trên hóa đơn
-        await tx.invoice.update({
-          where: { id: invoiceId },
-          data: {
-            paidAmount: newPaidAmount,
-            remainingAmount: newRemainingAmount,
-            status: newStatus,
-          },
-        });
-      }
-
-      // B. Sinh mã phiếu thu
-      const receiptCode = await generateDocumentCode(tx, 'PT');
-
-      // C. Tạo phiếu thu
-      const receipt = await tx.receipt.create({
-        data: {
-          code: receiptCode,
-          invoiceId: invoiceId || null,
-          customerId: finalCustomerId || null,
-          amount: payAmount,
-          date: date ? new Date(date) : new Date(),
-          paymentMethod: paymentMethod || 'BANK_TRANSFER',
-          receiverId: session.userId,
-          note,
-        },
-        include: {
-          customer: true,
-          invoice: true,
-        },
-      });
-
-      return receipt;
-    });
-
-    // Ghi nhật ký hệ thống
-    await prisma.activityLog.create({
-      data: {
-        userId: session.userId,
-        username: session.username,
-        action: 'CREATE_RECEIPT',
-        details: `Lập phiếu thu tiền: ${result.code} (Số tiền: ${result.amount} VND, Khách hàng: ${result.customer?.name || 'Vãng lai'}, Hình thức: ${result.paymentMethod})`,
-        ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
-      },
-    });
-
-    return NextResponse.json({ message: 'Tạo phiếu thu thành công', receipt: result });
-  } catch (error: any) {
-    console.error('Lỗi POST Receipt:', error);
-    return NextResponse.json({ error: error.message || 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return NextResponse.json({ message: 'Tạo phiếu thu thành công', receipt });
+  } catch (error) {
+    if (error instanceof BusinessError) return fail(error.message, error.status);
+    return handleError('POST Receipt', error);
   }
 }

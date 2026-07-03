@@ -12,7 +12,7 @@
 
 Next.js 16 monolith: `src/app/(dashboard)` = giao diện, `src/app/api` = API nội bộ, `prisma/` = schema
 CSDL PostgreSQL. Không có service riêng biệt. Xác thực bằng JWT tự ký lưu trong cookie HttpOnly, middleware
-(`src/middleware.ts`) chặn trang chưa đăng nhập ở tầng route.
+(`src/proxy.ts`) chặn trang chưa đăng nhập ở tầng route.
 
 Nghiệp vụ lõi: Khách hàng/NCC → Sản phẩm+Kho → Báo giá → **chuyển đổi thành** Hóa đơn → Phiếu thu (cập nhật
 công nợ hóa đơn). Song song có Phiếu chi, Chi phí, Nhật ký hoạt động, Cài đặt công ty (dùng cho VietQR).
@@ -82,7 +82,10 @@ Docker Desktop tự khởi động.
 - **Giai đoạn 1 đã xong (03/07/2026)**: vá 3 lỗi nghiêm trọng + lỗi G (JWT_SECRET) + lỗi H (nuốt lỗi sinh mã).
   Kiểm chứng 10/10 PASS bằng `scripts/verify-gd1.mjs`. Nghiệp vụ đã chốt: cho phép bán âm kho (cảnh báo,
   không chặn); convert báo giá có trừ kho.
-- **Tiếp theo: Giai đoạn 2** — phân tầng Service + Zod validation + `organizationId` + chuyển middleware →
-  proxy (Next 16 deprecated middleware). Cần viết SPEC mới theo template trước khi làm.
+- **Giai đoạn 2 đã xong (03/07/2026)**: khung src/server (http/auth/activity-log), Zod validators, services
+  (invoice core dùng chung cho tạo trực tiếp + convert), Organization/organizationId (nullable, chưa dùng),
+  middleware → proxy. Verify GĐ1 10/10 + GĐ2 4/4 trên dev lẫn prod Docker.
+- **Tiếp theo: Giai đoạn 3** — RBAC theo bảng Permission, đóng /register công khai, verify JWT trong proxy,
+  giới hạn upload. Viết SPEC trước khi làm.
 - Vai trò hệ thống hiện dùng: ADMIN, MANAGER, ACCOUNTANT, STAFF (đã xác nhận đúng nhu cầu người dùng).
 - Git: repo https://github.com/Trungnc273/Xuat_hoa_don (private), quy ước mỗi task một commit.

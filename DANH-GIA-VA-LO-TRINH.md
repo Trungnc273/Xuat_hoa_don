@@ -174,11 +174,11 @@ PostgreSQL (DB)  +  Cache (đọc nhiều)  +  Lưu trữ file (uploads)
 > Kết thúc GĐ1: app **an toàn để dùng thật với dữ liệu thật**.
 
 ### Giai đoạn 2 — Chuẩn hóa kiến trúc nền
-- [ ] Tạo tầng `withAuth` (xác thực + phân quyền dùng chung).
-- [ ] Tạo tầng Validation Zod cho các nghiệp vụ ghi (hóa đơn, phiếu thu, khách hàng, sản phẩm...).
-- [ ] Rút logic nghiệp vụ ra tầng Service, để route mỏng lại.
-- [ ] Chuẩn hóa xử lý lỗi & định dạng response.
-- [ ] Thêm cột `organizationId` vào schema ("để cửa" cho tương lai — xem Mục 0b).
+- [x] Tạo tầng `withAuth` (requireAuth) (xác thực + phân quyền dùng chung).
+- [x] Tạo tầng Validation Zod cho các nghiệp vụ ghi (hóa đơn, phiếu thu, khách hàng, sản phẩm...).
+- [x] Rút logic nghiệp vụ ra tầng Service (3 luồng tài chính nặng nhất; 2 luồng tạo hóa đơn dùng chung 1 hàm), để route mỏng lại.
+- [x] Chuẩn hóa xử lý lỗi & định dạng response.
+- [x] Thêm cột `organizationId` vào schema ("để cửa" cho tương lai — xem Mục 0b).
 > Kết thúc GĐ2: **base code ổn, dễ bảo trì và mở rộng**.
 
 ### Giai đoạn 3 — Hoàn thiện phân quyền & bảo mật

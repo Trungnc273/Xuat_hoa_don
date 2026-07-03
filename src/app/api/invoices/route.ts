@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateDocumentCode } from '@/lib/codegen';
+import { requireAuth } from '@/server/auth';
+import { handleError } from '@/server/http';
+import { logActivity } from '@/server/activity-log';
+import { createInvoiceSchema } from '@/server/validators/sales';
+import { computeTotals, createInvoiceCore } from '@/server/services/invoice.service';
 
 // 1. GET: Danh sách hóa đơn (có phân trang, lọc trạng thái, tìm kiếm)
 export async function GET(req: Request) {
@@ -71,173 +75,29 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. POST: Tạo mới hóa đơn trực tiếp (Giảm kho, tạo StockMovement xuất kho)
+// 2. POST: Tạo mới hóa đơn trực tiếp (Route mỏng: auth → validate → service → response)
 export async function POST(req: Request) {
   try {
-    const session = await verifyAuth(req);
-    if (!session) {
-      return NextResponse.json({ error: 'Chưa xác thực người dùng' }, { status: 401 });
-    }
+    const auth = await requireAuth(req, ['ADMIN', 'MANAGER', 'STAFF']);
+    if (!auth.ok) return auth.response;
 
-    if (!['ADMIN', 'MANAGER', 'STAFF'].includes(session.role)) {
-      return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
-    }
+    const input = createInvoiceSchema.parse(await req.json());
+    const totals = computeTotals(input.items);
 
-    const body = await req.json();
-    const { customerId, notes, items, templateName } = body;
-
-    if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'Vui lòng cung cấp khách hàng và danh sách sản phẩm' }, { status: 400 });
-    }
-
-    // 1. Tính toán giá trị hóa đơn
-    let subtotal = 0;
-    let discountAmount = 0;
-    let vatAmount = 0;
-    let total = 0;
-
-    const itemsData = items.map((item: any) => {
-      const unitPrice = parseFloat(item.unitPrice || 0);
-      const quantity = parseInt(item.quantity || 1);
-      const vatRate = parseFloat(item.vatRate || 10);
-      const discountRate = parseFloat(item.discountRate || 0);
-
-      const itemSubtotal = unitPrice * quantity;
-      const itemDiscount = itemSubtotal * (discountRate / 100);
-      const itemAfterDiscount = itemSubtotal - itemDiscount;
-      const itemVat = itemAfterDiscount * (vatRate / 100);
-      const itemAmount = itemAfterDiscount + itemVat;
-
-      subtotal += itemSubtotal;
-      discountAmount += itemDiscount;
-      vatAmount += itemVat;
-      total += itemAmount;
-
-      return {
-        productId: item.productId || null,
-        productName: item.productName,
-        productSku: item.productSku || null,
-        unitPrice,
-        vatRate,
-        discountRate,
-        quantity,
-        amount: itemAmount,
-      };
+    const { invoice, stockWarnings } = await createInvoiceCore({
+      session: auth.session,
+      customerId: input.customerId,
+      totals,
+      notes: input.notes,
+      templateName: input.templateName,
     });
 
-    // 2. Đọc cài đặt ngân hàng (QR sinh trong transaction, sau khi có mã hóa đơn thật)
-    const setting = await prisma.setting.findFirst();
-
-    // Lấy kho chính phục vụ xuất kho
-    let defaultWh = await prisma.warehouse.findFirst();
-    if (!defaultWh) {
-      defaultWh = await prisma.warehouse.create({
-        data: {
-          code: 'KHO000001',
-          name: 'Kho trung tâm',
-          description: 'Kho mặc định của hệ thống',
-        },
-      });
-    }
-
-    // 3. Thực hiện trong transaction
-    const stockWarnings: { productId: string; productName: string; newStock: number }[] = [];
-    const invoice = await prisma.$transaction(async (tx) => {
-      // Sinh mã hóa đơn atomic (SPEC GĐ1, FR-2)
-      const invoiceCode = await generateDocumentCode(tx, 'HD');
-
-      // Sinh QR VietQR động theo mã thật
-      let qrCodeUrl = '';
-      if (setting && setting.bankAccount) {
-        const parts = setting.bankAccount.split('-');
-        if (parts.length >= 3) {
-          const bankBin = parts[0].trim();
-          const accountNo = parts[1].trim();
-          const accountName = encodeURIComponent(parts[2].trim());
-          const addInfo = encodeURIComponent(`Thanh toan hoa don ${invoiceCode}`);
-          qrCodeUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${total}&addInfo=${addInfo}&accountName=${accountName}`;
-        }
-      }
-
-      // A. Tạo hóa đơn
-      const createdInvoice = await tx.invoice.create({
-        data: {
-          code: invoiceCode,
-          customerId,
-          creatorId: session.userId,
-          status: 'UNPAID',
-          notes,
-          subtotal,
-          vatAmount,
-          discountAmount,
-          total,
-          paidAmount: 0,
-          remainingAmount: total,
-          qrCode: qrCodeUrl || null,
-          templateName: templateName || 'DEFAULT',
-          items: {
-            create: itemsData,
-          },
-        },
-        include: {
-          items: true,
-          customer: true,
-        },
-      });
-
-      // B. Trừ kho và tạo StockMovement cho từng sản phẩm
-      for (const item of itemsData) {
-        if (item.productId) {
-          const product = await tx.product.findUnique({
-            where: { id: item.productId },
-          });
-
-          if (product) {
-            const prevStock = product.stock;
-            // Tồn kho phải trung thực: cho phép âm (bán trước nhập sau), cấm cắt về 0 (SPEC GĐ1, FR-3)
-            const newStock = prevStock - item.quantity;
-
-            // Cập nhật tồn kho sản phẩm
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { stock: newStock },
-            });
-
-            // Ghi nhận xuất kho với số liệu thật
-            await tx.stockMovement.create({
-              data: {
-                type: 'OUT',
-                productId: item.productId,
-                quantity: item.quantity,
-                prevStock,
-                newStock,
-                warehouseId: defaultWh.id,
-                reason: `Xuất kho bán hàng theo hóa đơn ${createdInvoice.code}`,
-                createdBy: session.username,
-              },
-            });
-
-            // Cảnh báo cho người bán biết cần nhập bù
-            if (newStock < 0) {
-              stockWarnings.push({ productId: product.id, productName: product.name, newStock });
-            }
-          }
-        }
-      }
-
-      return createdInvoice;
-    }, { maxWait: 10000, timeout: 20000 });
-
-    // Ghi nhật ký hệ thống
-    await prisma.activityLog.create({
-      data: {
-        userId: session.userId,
-        username: session.username,
-        action: 'CREATE_INVOICE',
-        details: `Đã tạo hóa đơn mới: ${invoice.code} cho khách hàng ${invoice.customer.name} (Số tiền: ${invoice.total} VND). Đã trừ kho tương ứng.`,
-        ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
-      },
-    });
+    await logActivity(
+      auth.session,
+      'CREATE_INVOICE',
+      `Đã tạo hóa đơn mới: ${invoice.code} cho khách hàng ${invoice.customer.name} (Số tiền: ${invoice.total} VND). Đã trừ kho tương ứng.`,
+      req
+    );
 
     return NextResponse.json({
       message: 'Tạo hóa đơn thành công',
@@ -246,7 +106,6 @@ export async function POST(req: Request) {
       stockWarnings,
     });
   } catch (error) {
-    console.error('Lỗi POST Invoice:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Invoice', error);
   }
 }

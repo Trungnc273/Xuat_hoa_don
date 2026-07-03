@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { handleError } from '@/server/http';
+import { partnerSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bạn không có quyền thực hiện chức năng này' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = partnerSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
     const { name, company, taxCode, address, email, phone, contactPerson, note } = body;
 
     if (!name) {
@@ -106,7 +108,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Tạo nhà cung cấp thành công', supplier });
   } catch (error) {
-    console.error('Lỗi POST Supplier:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    return handleError('POST Supplier', error);
   }
 }
