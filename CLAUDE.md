@@ -75,6 +75,15 @@ Docker Desktop tự khởi động.
 - **03/07/2026 — Trộn 2 phiên bản code trên cùng DB làm lệch bộ đếm mã.** Ảnh cũ (count()+1) tạo chứng từ
   vượt xa `document_counters` → ảnh mới sinh mã trùng (P2002). Đã có sẵn SQL resync bộ đếm theo MAX(code)
   từng bảng (xem lịch sử chat 03/07 hoặc migration backfill làm mẫu) — chạy khi nghi ngờ lệch.
+- **04/07/2026 — [ĐÃ SỬA] Bug thật: seed.ts tạo mã cứng (SP000001...) TRƯỚC khi document_counters biết đến chúng.**
+  Migration backfill bộ đếm chạy lúc DB còn RỖNG (trước seed) → counter = 0, nhưng seed lại tạo sản phẩm/
+  khách hàng/NCC/kho với mã cứng. Lần đầu tạo mới qua UI, bộ đếm tăng lên 1 → sinh lại đúng mã đã bị seed
+  chiếm → lỗi P2002 trên `code`, nhưng message cũ gộp chung thành "SKU/Barcode đã tồn tại" khiến chủ dự án
+  tưởng nhầm là lỗi double-submit (giả thuyết ban đầu SAI, đã sửa sau khi xem log thật). **Bài học kép:**
+  (1) mọi migration backfill dựa trên dữ liệu hiện có phải chạy SAU cùng, hoặc seed phải tự đồng bộ lại
+  counter ở bước cuối (đã thêm `resyncCounter()` vào seed.ts) — không giả định thứ tự chạy; (2) thông báo
+  lỗi P2002 phải phân biệt theo `error.meta.target`, không gộp chung nhiều nguyên nhân vào 1 message —
+  gộp chung khiến chẩn đoán sai hướng, phải xin log thật mới lộ ra nguyên nhân đúng.
 - **04/07/2026 — Form không khóa nút Lưu → double-submit trùng SKU/barcode qua ngrok.** Khách demo qua
   ngrok (độ trễ cao hơn localhost) bấm "Lưu sản phẩm" nhiều lần vì modal đóng chậm → request 2 tạo trùng
   SKU với request 1 vừa thành công, nhận nhầm lỗi "SKU đã tồn tại" tưởng là bug dữ liệu trong khi sản phẩm

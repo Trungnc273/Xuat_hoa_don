@@ -149,8 +149,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'Tạo sản phẩm thành công', product: result });
   } catch (error: any) {
     console.error('Lỗi POST Product:', error);
-    // Xử lý lỗi trùng lặp SKU hoặc Barcode
+    // Phân biệt đúng trường bị trùng theo error.meta.target — không gộp chung "SKU hoặc Barcode"
+    // cho cả trường hợp trùng mã `code` tự sinh (04/07/2026 — xem CLAUDE.md bài học)
     if (error.code === 'P2002') {
+      const target = (error.meta?.target as string[] | undefined) || [];
+      if (target.includes('code')) {
+        return NextResponse.json(
+          { error: 'Mã sản phẩm tự sinh bị trùng — thử lại lần nữa (bộ đếm mã đang được đồng bộ)' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: 'Mã SKU hoặc Barcode đã tồn tại trong hệ thống' }, { status: 400 });
     }
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });

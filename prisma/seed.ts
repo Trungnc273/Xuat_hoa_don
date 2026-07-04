@@ -421,6 +421,31 @@ async function main() {
     },
   });
 
+  // Đồng bộ lại bộ đếm mã chứng từ (document_counters) theo mã LỚN NHẤT thực tế sau khi seed.
+  // Bắt buộc phải làm bước này: seed tạo sản phẩm/khách hàng/NCC/kho với mã CỨNG (SP000001...),
+  // trong khi migration khởi tạo document_counters TRƯỚC khi seed chạy (DB rỗng lúc đó → đếm = 0).
+  // Không đồng bộ lại thì lần đầu tạo mới qua UI sẽ sinh trùng mã với dữ liệu mẫu (lỗi P2002).
+  console.log('Đồng bộ lại bộ đếm mã chứng từ...');
+  const resyncCounter = async (prefix: string, table: string, codeLength: number) => {
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "document_counters" ("prefix", "lastNumber")
+      VALUES ($1, COALESCE((
+        SELECT MAX(CAST(SUBSTRING("code" FROM ${codeLength + 1}) AS INT))
+        FROM "${table}" WHERE "code" ~ '^${prefix}[0-9]+$'
+      ), 0))
+      ON CONFLICT ("prefix") DO UPDATE SET "lastNumber" = GREATEST("document_counters"."lastNumber", EXCLUDED."lastNumber")
+    `, prefix);
+  };
+  await resyncCounter('SP', 'products', 2);
+  await resyncCounter('KH', 'customers', 2);
+  await resyncCounter('NCC', 'suppliers', 3);
+  await resyncCounter('KHO', 'warehouses', 3);
+  await resyncCounter('HD', 'invoices', 2);
+  await resyncCounter('BG', 'quotations', 2);
+  await resyncCounter('PT', 'receipts', 2);
+  await resyncCounter('PC', 'payments', 2);
+  await resyncCounter('CP', 'expenses', 2);
+
   console.log('Gieo dữ liệu thành công!');
 }
 
