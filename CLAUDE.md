@@ -75,6 +75,11 @@ Docker Desktop tự khởi động.
 - **03/07/2026 — Trộn 2 phiên bản code trên cùng DB làm lệch bộ đếm mã.** Ảnh cũ (count()+1) tạo chứng từ
   vượt xa `document_counters` → ảnh mới sinh mã trùng (P2002). Đã có sẵn SQL resync bộ đếm theo MAX(code)
   từng bảng (xem lịch sử chat 03/07 hoặc migration backfill làm mẫu) — chạy khi nghi ngờ lệch.
+- **04/07/2026 — Form không khóa nút Lưu → double-submit trùng SKU/barcode qua ngrok.** Khách demo qua
+  ngrok (độ trễ cao hơn localhost) bấm "Lưu sản phẩm" nhiều lần vì modal đóng chậm → request 2 tạo trùng
+  SKU với request 1 vừa thành công, nhận nhầm lỗi "SKU đã tồn tại" tưởng là bug dữ liệu trong khi sản phẩm
+  đã tạo thành công từ lần bấm đầu. **Bài học:** mọi form ghi dữ liệu phải có state `saving` khóa nút submit
+  ngay khi bấm — không chỉ để UX đẹp, mà để loại cả một lớp lỗi "trùng dữ liệu giả" gây hiểu lầm là bug backend.
 - **03/07/2026 — Hướng dẫn cài prod bỏ sót `npm install` trước bước seed.** Khách hàng đầu tiên clone
   repo, làm đúng `HUONG-DAN-CAI-DAT.md` nhưng chạy thẳng `npx prisma db seed` mà chưa `npm install` →
   seed không tạo được tài khoản (bảng `users` rỗng), đăng nhập báo "sai tài khoản/mật khẩu" — dễ hiểu lầm
