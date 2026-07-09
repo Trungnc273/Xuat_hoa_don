@@ -17,8 +17,8 @@ interface Product {
   sku: string | null;
   barcode: string | null;
   name: string;
-  categoryId: string;
-  category: { name: string };
+  categoryId: string | null;
+  category: { name: string } | null;
   importPrice: number;
   salePrice: number;
   vatRate: number;
@@ -223,7 +223,7 @@ export default function ProductsPage() {
     setName(product.name);
     setSku(product.sku || '');
     setBarcode(product.barcode || '');
-    setCategoryId(product.categoryId);
+    setCategoryId(product.categoryId ?? '');
     setImportPrice(product.importPrice.toString());
     setSalePrice(product.salePrice.toString());
     setVatRate(product.vatRate.toString());
@@ -537,7 +537,7 @@ export default function ProductsPage() {
                       )}
                     </td>
                     <td className="p-3 font-semibold text-foreground max-w-[200px] truncate">{p.name}</td>
-                    <td className="p-3 text-muted-foreground">{p.category.name}</td>
+                    <td className="p-3 text-muted-foreground">{p.category?.name ?? 'Không phân mục'}</td>
                     <td className="p-3 font-semibold text-muted-foreground">{formatCurrency(p.importPrice)}</td>
                     <td className="p-3 font-extrabold text-foreground">{formatCurrency(p.salePrice)}</td>
                     <td className="p-3 text-muted-foreground">{p.unit}</td>
