@@ -10,6 +10,8 @@ export const partnerSchema = z.object({
   email: z.string().trim().email('Email không hợp lệ').nullish().or(z.literal('').transform(() => undefined)),
   phone: optionalStr,
   contactPerson: optionalStr,
+  tagName: optionalStr,
+  tagColor: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Màu tag không hợp lệ').nullish().or(z.literal('').transform(() => undefined)),
   note: optionalStr,
 });
 

@@ -19,9 +19,13 @@ interface Customer {
   email: string | null;
   phone: string | null;
   contactPerson: string | null;
+  tagName: string | null;
+  tagColor: string | null;
   note: string | null;
   createdAt: string;
 }
+
+const TAG_COLORS = ['#2563eb', '#16a34a', '#f97316', '#dc2626', '#9333ea', '#0891b2', '#64748b'];
 
 interface CustomerInvoice {
   id: string;
@@ -67,6 +71,8 @@ export default function CustomersPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [contactPerson, setContactPerson] = useState('');
+  const [tagName, setTagName] = useState('');
+  const [tagColor, setTagColor] = useState(TAG_COLORS[0]);
   const [note, setNote] = useState('');
 
   const { user } = useApp();
@@ -125,6 +131,8 @@ export default function CustomersPage() {
     setEmail(customer.email || '');
     setPhone(customer.phone || '');
     setContactPerson(customer.contactPerson || '');
+    setTagName(customer.tagName || '');
+    setTagColor(customer.tagColor || TAG_COLORS[0]);
     setNote(customer.note || '');
     setIsEditOpen(true);
   };
@@ -137,7 +145,7 @@ export default function CustomersPage() {
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, note }),
+        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -161,7 +169,7 @@ export default function CustomersPage() {
       const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, note }),
+        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -207,9 +215,48 @@ export default function CustomersPage() {
     setEmail('');
     setPhone('');
     setContactPerson('');
+    setTagName('');
+    setTagColor(TAG_COLORS[0]);
     setNote('');
     setError('');
   };
+
+  const renderTagFields = () => (
+    <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+      <div>
+        <label className="block font-semibold mb-1">Tag khách hàng</label>
+        <input
+          type="text"
+          value={tagName}
+          onChange={(e) => setTagName(e.target.value)}
+          className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground"
+          placeholder="VIP, C1, C2, đại lý..."
+        />
+      </div>
+      <div>
+        <label className="block font-semibold mb-1">Màu</label>
+        <input
+          type="color"
+          value={tagColor}
+          onChange={(e) => setTagColor(e.target.value)}
+          className="h-9 w-11 rounded border border-border bg-card p-1 cursor-pointer"
+          title="Chọn màu tag"
+        />
+      </div>
+      <div className="col-span-2 flex flex-wrap gap-1.5">
+        {TAG_COLORS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => setTagColor(color)}
+            className={`h-5 w-5 rounded-full border cursor-pointer ${tagColor === color ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card' : 'border-border'}`}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -263,6 +310,7 @@ export default function CustomersPage() {
                   <th className="p-3">Mã số</th>
                   <th className="p-3">Tên khách hàng</th>
                   <th className="p-3">Công ty</th>
+                  <th className="p-3">Tag</th>
                   <th className="p-3">Điện thoại</th>
                   <th className="p-3 text-right">Chức năng</th>
                 </tr>
@@ -270,11 +318,11 @@ export default function CustomersPage() {
               <tbody className="divide-y divide-border/50">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Đang tải danh sách...</td>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">Đang tải danh sách...</td>
                   </tr>
                 ) : customers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Không tìm thấy khách hàng nào.</td>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">Không tìm thấy khách hàng nào.</td>
                   </tr>
                 ) : (
                   customers.map((c) => (
@@ -286,6 +334,19 @@ export default function CustomersPage() {
                       <td className="p-3 font-bold text-foreground">{c.code}</td>
                       <td className="p-3 font-semibold text-foreground">{c.name}</td>
                       <td className="p-3 text-muted-foreground max-w-[150px] truncate">{c.company || '—'}</td>
+                      <td className="p-3">
+                        {c.tagName ? (
+                          <span
+                            className="inline-flex max-w-[120px] items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                            style={{ backgroundColor: c.tagColor || TAG_COLORS[0] }}
+                            title={c.tagName}
+                          >
+                            <span className="truncate">{c.tagName}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="p-3 text-muted-foreground">{c.phone || '—'}</td>
                       <td className="p-3 text-right flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -363,7 +424,18 @@ export default function CustomersPage() {
               {/* Profile nhanh */}
               <div>
                 <h4 className="text-sm font-bold text-foreground capitalize">{selectedCustomer.name}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">{selectedCustomer.code}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-muted-foreground">{selectedCustomer.code}</p>
+                  {selectedCustomer.tagName && (
+                    <span
+                      className="inline-flex max-w-[140px] items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                      style={{ backgroundColor: selectedCustomer.tagColor || TAG_COLORS[0] }}
+                      title={selectedCustomer.tagName}
+                    >
+                      <span className="truncate">{selectedCustomer.tagName}</span>
+                    </span>
+                  )}
+                </div>
                 <div className="mt-3 space-y-2 text-xs">
                   {selectedCustomer.company && (
                     <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -489,6 +561,8 @@ export default function CustomersPage() {
                 </div>
               </div>
 
+              {renderTagFields()}
+
               <div>
                 <label className="block font-semibold mb-1">Địa chỉ giao dịch</label>
                 <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground" />
@@ -554,6 +628,8 @@ export default function CustomersPage() {
                   <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground" />
                 </div>
               </div>
+
+              {renderTagFields()}
 
               <div>
                 <label className="block font-semibold mb-1">Địa chỉ giao dịch</label>

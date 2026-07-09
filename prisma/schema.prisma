@@ -73,6 +73,8 @@ model Customer {
   email         String?
   phone         String?
   contactPerson String?
+  tagName       String?
+  tagColor      String?
   note          String?
   quotations    Quotation[]
   invoices      Invoice[]

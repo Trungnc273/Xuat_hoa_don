@@ -33,6 +33,7 @@ export async function GET(req: Request) {
         { company: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
+        { tagName: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
     const session = auth.session;
 
     const body = partnerSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
-    const { name, company, taxCode, address, email, phone, contactPerson, note } = body;
+    const { name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'Tên khách hàng là bắt buộc' }, { status: 400 });
@@ -91,6 +92,8 @@ export async function POST(req: Request) {
         email,
         phone,
         contactPerson,
+        tagName,
+        tagColor,
         note,
       },
       });

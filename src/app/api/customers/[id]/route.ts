@@ -70,7 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = await req.json();
-    const { name, company, taxCode, address, email, phone, contactPerson, note } = body;
+    const { name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note } = body;
 
     const existingCustomer = await prisma.customer.findUnique({
       where: { id },
@@ -90,6 +90,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         email,
         phone,
         contactPerson,
+        tagName,
+        tagColor,
         note,
       },
     });

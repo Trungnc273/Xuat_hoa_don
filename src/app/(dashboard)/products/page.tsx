@@ -105,6 +105,7 @@ export default function ProductsPage() {
   const [catDesc, setCatDesc] = useState('');
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState('');
+  const [inlineCategoryMode, setInlineCategoryMode] = useState(false);
 
   // Submit Category (Add or Update)
   const handleCategorySubmit = async (e: React.FormEvent) => {
@@ -131,13 +132,31 @@ export default function ProductsPage() {
         setCatName('');
         setCatDesc('');
         setEditingCatId(null);
-        fetchCategories();
+        void fetchCategories();
+        if (!editingCatId && inlineCategoryMode && data.category?.id) {
+          setCategoryId(data.category.id);
+          setInlineCategoryMode(false);
+          setIsCategoryOpen(false);
+        }
       } else {
         setCategoryError(data.error || 'Có lỗi xảy ra');
       }
     } catch {
       setCategoryError('Lỗi kết nối máy chủ');
     }
+  };
+
+  const handleCategorySelect = (value: string) => {
+    if (value === '__create__') {
+      setInlineCategoryMode(true);
+      setEditingCatId(null);
+      setCatName('');
+      setCatDesc('');
+      setCategoryError('');
+      setIsCategoryOpen(true);
+      return;
+    }
+    setCategoryId(value);
   };
 
   // Delete Category
@@ -486,7 +505,7 @@ export default function ProductsPage() {
 
         {['ADMIN', 'MANAGER'].includes(user?.role || '') && (
           <button
-            onClick={() => { setCategoryError(''); setIsCategoryOpen(true); }}
+            onClick={() => { setInlineCategoryMode(false); setCategoryError(''); setIsCategoryOpen(true); }}
             className="rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
           >
             Quản lý danh mục
@@ -631,11 +650,12 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Nhóm danh mục</label>
-                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none bg-card cursor-pointer">
-                    <option value="">Chọn danh mục</option>
+                  <select value={categoryId} onChange={(e) => handleCategorySelect(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none bg-card cursor-pointer">
+                    <option value="">Không phân mục</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
+                    <option value="__create__">+ Thêm phân loại mới...</option>
                   </select>
                 </div>
                 <div>
@@ -744,11 +764,12 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Nhóm danh mục</label>
-                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none bg-card cursor-pointer">
+                  <select value={categoryId} onChange={(e) => handleCategorySelect(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none bg-card cursor-pointer">
                     <option value="">Không phân mục</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
+                    <option value="__create__">+ Thêm phân loại mới...</option>
                   </select>
                 </div>
                 <div>
@@ -876,7 +897,7 @@ export default function ProductsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl relative max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
             <button
-              onClick={() => { setIsCategoryOpen(false); setEditingCatId(null); setCatName(''); setCatDesc(''); }}
+              onClick={() => { setIsCategoryOpen(false); setInlineCategoryMode(false); setEditingCatId(null); setCatName(''); setCatDesc(''); }}
               className="absolute top-4 right-4 rounded-md p-1 hover:bg-secondary text-muted-foreground cursor-pointer"
             >
               <X className="h-5 w-5" />
