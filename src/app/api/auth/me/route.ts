@@ -37,7 +37,12 @@ export async function GET(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'Không tìm thấy người dùng' }, { status: 404 });
+      const response = NextResponse.json(
+        { error: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại' },
+        { status: 401 }
+      );
+      response.cookies.delete('token');
+      return response;
     }
 
     // Biến đổi danh sách quyền phẳng cho dễ kiểm tra trên Frontend
