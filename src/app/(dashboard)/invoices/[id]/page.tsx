@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ArrowLeft, Printer, Landmark, XCircle, AlertCircle, 
-  CheckCircle2, DollarSign, RefreshCw, Layers, Sparkles
+  ArrowLeft, Printer, XCircle, AlertCircle,
+  DollarSign, Layers
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -89,10 +90,7 @@ export default function InvoiceDetailPage() {
   const [paying, setPaying] = useState(false);
 
   const { user } = useApp();
-  const router = useRouter();
-
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
     try {
       const [resI, resS] = await Promise.all([
         fetch(`/api/invoices/${id}`),
@@ -111,16 +109,16 @@ export default function InvoiceDetailPage() {
         const data = await resS.json();
         setSetting(data.setting);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchData();
-  }, [id]);
+    queueMicrotask(() => void fetchData());
+  }, [fetchData]);
 
   // Thay đổi mẫu in (Save mẫu vào DB)
   const handleTemplateChange = async (tpl: string) => {
@@ -179,11 +177,11 @@ export default function InvoiceDetailPage() {
       if (res.ok) {
         setIsPayOpen(false);
         setPayNote('');
-        fetchData(); // Tải lại chi tiết hóa đơn mới
+        void fetchData(); // Tải lại chi tiết hóa đơn mới
       } else {
         setPayError(data.error);
       }
-    } catch (err) {
+    } catch {
       setPayError('Lỗi kết nối máy chủ');
     } finally {
       setPaying(false);
@@ -295,7 +293,7 @@ export default function InvoiceDetailPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-gray-200 pb-6">
               <div className="space-y-1">
                 {setting?.logo && (
-                  <img src={setting.logo} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
+                  <Image src={setting.logo} alt="Company Logo" width={180} height={48} unoptimized className="h-12 w-auto mb-2 object-contain" />
                 )}
                 <h2 className="text-base font-extrabold tracking-tight uppercase">{setting?.companyName || 'Công ty Cổ phần Giải pháp Công nghệ SolTech'}</h2>
                 <p className="text-xs text-gray-600 font-semibold">Mã số thuế: {setting?.taxCode || '0101234567'}</p>
@@ -345,7 +343,7 @@ export default function InvoiceDetailPage() {
                       <td className="py-2.5 px-2">
                         <div className="flex items-center gap-2">
                           {item.productImages && item.productImages.length > 0 ? (
-                            <img src={item.productImages[0]} alt={item.productName} className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
+                            <Image src={item.productImages[0]} alt={item.productName} width={36} height={36} unoptimized className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
                           ) : (
                             <div className="h-9 w-9 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 bg-gray-50 flex-shrink-0">Ảnh</div>
                           )}
@@ -370,7 +368,7 @@ export default function InvoiceDetailPage() {
               <div>
                 {invoice.qrCode && (
                   <div className="border border-gray-200 p-3.5 rounded-xl bg-gray-50 text-center w-fit space-y-2">
-                    <img src={invoice.qrCode} alt="VietQR Payment Link" className="h-32 w-32 mx-auto object-contain border border-white bg-white" />
+                    <Image src={invoice.qrCode} alt="VietQR Payment Link" width={128} height={128} unoptimized className="h-32 w-32 mx-auto object-contain border border-white bg-white" />
                     <p className="text-[9px] font-bold text-gray-700 uppercase tracking-wider leading-none">Quét mã chuyển khoản nhanh</p>
                   </div>
                 )}
@@ -475,7 +473,7 @@ export default function InvoiceDetailPage() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           {item.productImages && item.productImages.length > 0 ? (
-                            <img src={item.productImages[0]} alt={item.productName} className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
+                            <Image src={item.productImages[0]} alt={item.productName} width={36} height={36} unoptimized className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
                           ) : (
                             <div className="h-9 w-9 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 bg-gray-50 flex-shrink-0">Ảnh</div>
                           )}
@@ -500,7 +498,7 @@ export default function InvoiceDetailPage() {
               <div>
                 {invoice.qrCode && (
                   <div className="border border-indigo-100 p-3 rounded-2xl bg-indigo-50/30 flex items-center gap-4">
-                    <img src={invoice.qrCode} alt="VietQR" className="h-28 w-28 object-contain bg-white rounded-lg border border-white" />
+                    <Image src={invoice.qrCode} alt="VietQR" width={112} height={112} unoptimized className="h-28 w-28 object-contain bg-white rounded-lg border border-white" />
                     <div>
                       <p className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider">Thanh toán tự động</p>
                       <p className="text-[9px] text-gray-500 max-w-[120px] mt-1">Quét mã bằng bất kỳ ví hoặc app ngân hàng của bạn để thanh toán nợ.</p>
@@ -584,7 +582,7 @@ export default function InvoiceDetailPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           {item.productImages && item.productImages.length > 0 ? (
-                            <img src={item.productImages[0]} alt={item.productName} className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
+                            <Image src={item.productImages[0]} alt={item.productName} width={36} height={36} unoptimized className="h-9 w-9 rounded object-cover border border-gray-200 bg-gray-50 flex-shrink-0" />
                           ) : (
                             <div className="h-9 w-9 rounded border border-dashed border-gray-300 flex items-center justify-center text-[8px] text-gray-400 bg-gray-50 flex-shrink-0">Ảnh</div>
                           )}

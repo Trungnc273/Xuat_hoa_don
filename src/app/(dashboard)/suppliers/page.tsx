@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   Plus, Search, Edit, Trash2, X, Eye, 
-  User, Building2, Phone, Mail, DollarSign,
+  User, Building2, Phone, Mail,
   AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -23,6 +23,24 @@ interface Supplier {
   createdAt: string;
 }
 
+interface SupplierPayment {
+  id: string;
+  code: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+}
+
+interface SupplierDetail {
+  supplier: Supplier & {
+    payments: SupplierPayment[];
+  };
+  summary: {
+    totalPaid: number;
+    totalPayments: number;
+  };
+}
+
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +52,7 @@ export default function SuppliersPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [supplierDetail, setSupplierDetail] = useState<any | null>(null);
+  const [supplierDetail, setSupplierDetail] = useState<SupplierDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,8 +68,7 @@ export default function SuppliersPage() {
 
   const { user } = useApp();
 
-  const fetchSuppliers = async () => {
-    setLoading(true);
+  const fetchSuppliers = useCallback(async () => {
     try {
       const res = await fetch(`/api/suppliers?search=${search}&page=${page}&limit=10`);
       if (res.ok) {
@@ -64,16 +81,17 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   useEffect(() => {
-    fetchSuppliers();
-  }, [page]);
+    queueMicrotask(() => void fetchSuppliers());
+  }, [fetchSuppliers]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchSuppliers();
+    void fetchSuppliers();
   };
 
   const handleViewDetail = async (supplier: Supplier) => {
@@ -123,7 +141,7 @@ export default function SuppliersPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };
@@ -147,7 +165,7 @@ export default function SuppliersPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };
@@ -168,7 +186,7 @@ export default function SuppliersPage() {
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện xóa');
     }
   };
@@ -373,7 +391,7 @@ export default function SuppliersPage() {
                     <p className="text-xs text-muted-foreground py-2">Chưa lập phiếu chi nào cho nhà cung cấp này.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {supplierDetail.supplier.payments.map((p: any) => (
+                      {supplierDetail.supplier.payments.map((p) => (
                         <div key={p.id} className="flex justify-between items-center text-xs border border-border/40 p-2 rounded-lg bg-card">
                           <div>
                             <p className="font-bold text-foreground">{p.code}</p>

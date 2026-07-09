@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         role: user.role.name,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleError('API Đăng nhập', error);
   }
 }

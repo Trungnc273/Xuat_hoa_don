@@ -23,7 +23,6 @@ export async function GET(req: Request) {
     const exportData = products.map((p) => ({
       'Mã Sản Phẩm': p.code,
       'Mã SKU': p.sku || '',
-      'Mã Barcode': p.barcode || '',
       'Tên Sản Phẩm': p.name,
       'Danh Mục': p.category?.name || 'Không phân mục',
       'Giá Nhập': p.importPrice,

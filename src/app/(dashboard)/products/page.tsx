@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { 
-  Plus, Search, Edit, Trash2, X, Eye, 
-  ShoppingBag, Folder, Tag, DollarSign, 
-  Layers, Upload, FileSpreadsheet, Download, 
+  Plus, Search, Edit, Trash2, X,
+  Upload, FileSpreadsheet, Download,
   ChevronLeft, ChevronRight, Image as ImageIcon
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -34,6 +34,8 @@ interface Category {
   name: string;
   description?: string | null;
 }
+
+type ProductImportRow = Record<string, string | number | boolean | null | undefined>;
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -70,8 +72,7 @@ export default function ProductsPage() {
 
   const { user } = useApp();
 
-  const fetchProducts = async () => {
-    setLoading(true);
+  const fetchProducts = useCallback(async () => {
     try {
       const res = await fetch(`/api/products?search=${search}&categoryId=${categoryIdFilter}&page=${page}&limit=10`);
       if (res.ok) {
@@ -84,7 +85,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryIdFilter, page, search]);
 
   const fetchCategories = async () => {
     try {
@@ -134,7 +135,7 @@ export default function ProductsPage() {
       } else {
         setCategoryError(data.error || 'Có lỗi xảy ra');
       }
-    } catch (err) {
+    } catch {
       setCategoryError('Lỗi kết nối máy chủ');
     }
   };
@@ -158,20 +159,23 @@ export default function ProductsPage() {
       } else {
         setCategoryError(data.error || 'Có lỗi xảy ra khi xóa');
       }
-    } catch (err) {
+    } catch {
       setCategoryError('Lỗi kết nối máy chủ');
     }
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [page, categoryIdFilter]);
+    queueMicrotask(() => {
+      void fetchProducts();
+      void fetchCategories();
+    });
+  }, [fetchProducts]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchProducts();
+    void fetchProducts();
   };
 
   // Upload hình ảnh sản phẩm lên server
@@ -201,7 +205,7 @@ export default function ProductsPage() {
         }
       }
       setImages(uploadedUrls);
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi khi tải ảnh lên');
     } finally {
       setUploadingImage(false);
@@ -265,7 +269,7 @@ export default function ProductsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     } finally {
       setSaving(false);
@@ -303,7 +307,7 @@ export default function ProductsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     } finally {
       setSaving(false);
@@ -321,7 +325,7 @@ export default function ProductsPage() {
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện xóa');
     }
   };
@@ -339,12 +343,12 @@ export default function ProductsPage() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const rawData = XLSX.utils.sheet_to_json(ws);
+        const rawData = XLSX.utils.sheet_to_json<ProductImportRow>(ws);
 
         // Map header tiếng Việt sang Key khớp API
-        const mappedProducts = rawData.map((row: any) => ({
+        const mappedProducts = rawData.map((row) => ({
           sku: row['Mã SKU'] || row['SKU'],
-          barcode: row['Mã Barcode'] || row['Barcode'],
+          barcode: undefined,
           name: row['Tên Sản Phẩm'] || row['Tên'],
           categoryName: row['Danh Mục'] || row['Nhóm'],
           importPrice: row['Giá Nhập'],
@@ -369,7 +373,7 @@ export default function ProductsPage() {
         } else {
           setError(data.error || 'Có lỗi xảy ra khi import tệp Excel');
         }
-      } catch (err) {
+      } catch {
         setError('Định dạng tệp tin Excel không đúng cấu trúc');
       }
     };
@@ -389,7 +393,7 @@ export default function ProductsPage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Sản Phẩm');
         XLSX.writeFile(workbook, 'danh_sach_san_pham.xlsx');
       }
-    } catch (err) {
+    } catch {
       alert('Đã xảy ra lỗi khi xuất Excel');
     }
   };
@@ -454,7 +458,7 @@ export default function ProductsPage() {
             <Search className="absolute inset-y-0 left-3 h-full w-4 text-muted-foreground flex items-center" />
             <input
               type="text"
-              placeholder="Tìm theo tên, SKU, barcode..."
+              placeholder="Tìm theo tên, SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:border-foreground focus:ring-1 focus:ring-foreground focus:outline-none transition-colors"
@@ -525,7 +529,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="p-3">
                       {p.images && p.images.length > 0 ? (
-                        <img src={p.images[0]} alt={p.name} className="h-9 w-9 rounded-lg object-cover border border-border bg-muted" />
+                        <Image src={p.images[0]} alt={p.name} width={36} height={36} unoptimized className="h-9 w-9 rounded-lg object-cover border border-border bg-muted" />
                       ) : (
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground border border-border">
                           <ImageIcon className="h-4 w-4" />
@@ -619,9 +623,8 @@ export default function ProductsPage() {
                   <label className="block font-semibold mb-1">Mã SKU</label>
                   <input type="text" value={sku} onChange={(e) => setSku(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" placeholder="LAP-DELL-5520" />
                 </div>
-                <div>
-                  <label className="block font-semibold mb-1">Mã Barcode</label>
-                  <input type="text" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" placeholder="89360..." />
+                <div className="hidden" aria-hidden="true">
+                  <input type="hidden" value={barcode} readOnly />
                 </div>
               </div>
 
@@ -669,7 +672,7 @@ export default function ProductsPage() {
                 <div className="flex flex-wrap gap-2.5 items-center mt-1">
                   {images.map((url, idx) => (
                     <div key={url} className="relative h-14 w-14 rounded-lg border border-border overflow-hidden bg-muted group">
-                      <img src={url} alt="product" className="h-full w-full object-cover" />
+                      <Image src={url} alt="product" width={56} height={56} unoptimized className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => removeImage(idx)}
@@ -733,9 +736,8 @@ export default function ProductsPage() {
                   <label className="block font-semibold mb-1">Mã SKU</label>
                   <input type="text" value={sku} onChange={(e) => setSku(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
-                <div>
-                  <label className="block font-semibold mb-1">Mã Barcode</label>
-                  <input type="text" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                <div className="hidden" aria-hidden="true">
+                  <input type="hidden" value={barcode} readOnly />
                 </div>
               </div>
 
@@ -775,7 +777,7 @@ export default function ProductsPage() {
                 <div className="flex flex-wrap gap-2.5 items-center mt-1">
                   {images.map((url, idx) => (
                     <div key={url} className="relative h-14 w-14 rounded-lg border border-border overflow-hidden bg-muted group">
-                      <img src={url} alt="product" className="h-full w-full object-cover" />
+                      <Image src={url} alt="product" width={56} height={56} unoptimized className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => removeImage(idx)}
@@ -837,7 +839,6 @@ export default function ProductsPage() {
                 <li><code className="text-primary">Giá Nhập</code> (Số nguyên)</li>
                 <li><code className="text-primary">Giá Bán</code> (Số nguyên)</li>
                 <li><code className="text-primary">Mã SKU</code> (Tùy chọn)</li>
-                <li><code className="text-primary">Mã Barcode</code> (Tùy chọn)</li>
                 <li><code className="text-primary">Thuế VAT (%)</code> (Số nguyên, mặc định 10)</li>
                 <li><code className="text-primary">Đơn Vị Tính</code> (Mặc định: Cái)</li>
                 <li><code className="text-primary">Tồn Kho</code> (Số lượng tồn kho ban đầu)</li>

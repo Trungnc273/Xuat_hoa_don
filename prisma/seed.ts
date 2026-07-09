@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Permission } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -71,7 +71,7 @@ async function main() {
   ];
 
   console.log('Đang khởi tạo các quyền...');
-  const permissions: any[] = [];
+  const permissions: Permission[] = [];
   for (const item of permissionsData) {
     const perm = await prisma.permission.upsert({
       where: {
@@ -263,7 +263,7 @@ async function main() {
     create: { code: 'KHO000001', name: 'Kho trung tâm', address: 'Khu công nghiệp Từ Liêm, Hà Nội', description: 'Kho chứa sản phẩm chính' },
   });
 
-  const whSub = await prisma.warehouse.upsert({
+  await prisma.warehouse.upsert({
     where: { code: 'KHO000002' },
     update: {},
     create: { code: 'KHO000002', name: 'Kho phụ miền Nam', address: 'Quận 12, TP. Hồ Chí Minh', description: 'Kho trung chuyển phía Nam' },
@@ -307,7 +307,7 @@ async function main() {
     },
   });
 
-  const p3 = await prisma.product.upsert({
+  await prisma.product.upsert({
     where: { code: 'SP000003' },
     update: {},
     create: {
@@ -327,7 +327,7 @@ async function main() {
 
   // 9. Khách hàng mẫu (Customers)
   console.log('Đang khởi tạo khách hàng mẫu...');
-  const c1 = await prisma.customer.upsert({
+  await prisma.customer.upsert({
     where: { code: 'KH000001' },
     update: {},
     create: {
@@ -343,7 +343,7 @@ async function main() {
     },
   });
 
-  const c2 = await prisma.customer.upsert({
+  await prisma.customer.upsert({
     where: { code: 'KH000002' },
     update: {},
     create: {
@@ -361,7 +361,7 @@ async function main() {
 
   // 10. Nhà cung cấp mẫu (Suppliers)
   console.log('Đang khởi tạo nhà cung cấp mẫu...');
-  const s1 = await prisma.supplier.upsert({
+  await prisma.supplier.upsert({
     where: { code: 'NCC000001' },
     update: {},
     create: {
@@ -377,7 +377,7 @@ async function main() {
     },
   });
 
-  const s2 = await prisma.supplier.upsert({
+  await prisma.supplier.upsert({
     where: { code: 'NCC000002' },
     update: {},
     create: {

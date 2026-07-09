@@ -7,6 +7,7 @@ import { logActivity } from '@/server/activity-log';
 import { createReceiptSchema } from '@/server/validators/sales';
 import { createReceipt } from '@/server/services/receipt.service';
 import { BusinessError } from '@/server/services/quotation.service';
+import type { Prisma } from '@prisma/client';
 
 // 1. GET: Danh sách phiếu thu
 export async function GET(req: Request) {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ReceiptWhereInput = {};
     if (search) {
       where.OR = [
         { code: { contains: search, mode: 'insensitive' } },

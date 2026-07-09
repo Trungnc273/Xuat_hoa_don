@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     // Đảm bảo thư mục tồn tại (tạo đệ quy nếu cần)
     try {
       await mkdir(uploadDir, { recursive: true });
-    } catch (e) {
+    } catch {
       // Đã tồn tại thư mục
     }
 

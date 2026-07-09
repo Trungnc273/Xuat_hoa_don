@@ -4,9 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Plus, Trash2, Save, ArrowLeft, 
-  Calendar, User, CreditCard, ShoppingBag, 
-  Percent, AlertCircle
+  Plus, Trash2, ArrowLeft,
+  ShoppingBag, AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -21,6 +20,7 @@ interface Product {
   code: string;
   sku: string | null;
   name: string;
+  description: string | null;
   salePrice: number;
   vatRate: number;
   unit: string;
@@ -30,6 +30,7 @@ interface QuotationItemInput {
   productId: string;
   productName: string;
   productSku: string;
+  description: string;
   unitPrice: number;
   quantity: number;
   vatRate: number;
@@ -82,6 +83,7 @@ export default function NewQuotationPage() {
       productId: '',
       productName: '',
       productSku: '',
+      description: '',
       unitPrice: 0,
       quantity: 1,
       vatRate: 10,
@@ -107,6 +109,7 @@ export default function NewQuotationPage() {
       productId: matchedProd.id,
       productName: matchedProd.name,
       productSku: matchedProd.sku || '',
+      description: matchedProd.description || newItems[index].description || '',
       unitPrice: matchedProd.salePrice,
       vatRate: matchedProd.vatRate,
       amount: calculateItemAmount(matchedProd.salePrice, newItems[index].quantity, matchedProd.vatRate, newItems[index].discountRate),
@@ -140,6 +143,15 @@ export default function NewQuotationPage() {
   };
 
   // Hàm tính thành tiền của dòng sản phẩm
+  const handleItemTextChange = (index: number, field: 'description', val: string) => {
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      [field]: val,
+    };
+    setItems(newItems);
+  };
+
   const calculateItemAmount = (price: number, qty: number, vat: number, disc: number) => {
     const sub = price * qty;
     const discount = sub * (disc / 100);
@@ -214,7 +226,7 @@ export default function NewQuotationPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi kết nối');
     } finally {
       setSubmitting(false);
@@ -318,7 +330,7 @@ export default function NewQuotationPage() {
 
           {items.length === 0 ? (
             <div className="text-center py-10 text-xs text-muted-foreground">
-              Chưa có sản phẩm nào. Nhấn "Thêm dòng sản phẩm" để chọn hàng hóa.
+              Chưa có sản phẩm nào. Nhấn &quot;Thêm dòng sản phẩm&quot; để chọn hàng hóa.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -326,6 +338,7 @@ export default function NewQuotationPage() {
                 <thead>
                   <tr className="border-b border-border text-muted-foreground font-semibold">
                     <th className="py-2 pr-2">Sản phẩm *</th>
+                    <th className="py-2 px-2 min-w-56">Mô tả / Thông số</th>
                     <th className="py-2 px-2 w-20">Đơn vị</th>
                     <th className="py-2 px-2 w-24">Số lượng</th>
                     <th className="py-2 px-2 w-32">Đơn giá bán</th>
@@ -353,6 +366,15 @@ export default function NewQuotationPage() {
                               <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
                             ))}
                           </select>
+                        </td>
+                        <td className="py-2 px-2">
+                          <textarea
+                            value={item.description}
+                            onChange={(e) => handleItemTextChange(index, 'description', e.target.value)}
+                            rows={2}
+                            className="w-full min-w-56 rounded border border-border p-1.5 bg-transparent resize-y focus:outline-none focus:border-foreground"
+                            placeholder="Quy cách, chất liệu, tính năng..."
+                          />
                         </td>
                         <td className="py-2 px-2 text-muted-foreground font-semibold">
                           {matchedProd?.unit || '—'}

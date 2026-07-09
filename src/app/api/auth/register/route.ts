@@ -89,7 +89,7 @@ export async function POST(req: Request) {
         role: newUser.role.name,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleError('API Đăng ký', error);
   }
 }

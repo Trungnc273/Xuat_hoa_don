@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   Plus, Search, Edit, Trash2, X, Eye, 
-  User, Building2, Phone, Mail, FileText, 
-  Landmark, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight
+  User, Building2, Phone, Mail,
+  AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -23,6 +23,27 @@ interface Customer {
   createdAt: string;
 }
 
+interface CustomerInvoice {
+  id: string;
+  code: string;
+  date: string;
+  total: number;
+  status: string;
+}
+
+interface CustomerDetail {
+  customer: Customer & {
+    invoices: CustomerInvoice[];
+  };
+  summary: {
+    totalInvoiced: number;
+    totalPaid: number;
+    outstandingDebt: number;
+    totalQuotations: number;
+    totalInvoices: number;
+  };
+}
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +55,7 @@ export default function CustomersPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerDetail, setCustomerDetail] = useState<any | null>(null);
+  const [customerDetail, setCustomerDetail] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,8 +71,7 @@ export default function CustomersPage() {
 
   const { user } = useApp();
 
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = useCallback(async () => {
     try {
       const res = await fetch(`/api/customers?search=${search}&page=${page}&limit=10`);
       if (res.ok) {
@@ -64,16 +84,17 @@ export default function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   useEffect(() => {
-    fetchCustomers();
-  }, [page]);
+    queueMicrotask(() => void fetchCustomers());
+  }, [fetchCustomers]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchCustomers();
+    void fetchCustomers();
   };
 
   // Xem chi tiết khách hàng và lịch sử mua hàng
@@ -126,7 +147,7 @@ export default function CustomersPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };
@@ -151,7 +172,7 @@ export default function CustomersPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };
@@ -173,7 +194,7 @@ export default function CustomersPage() {
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện xóa');
     }
   };
@@ -194,7 +215,7 @@ export default function CustomersPage() {
     <div className="space-y-6">
       
       {/* HEADER VÀ NÚT THÊM MỚI */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col items-start gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Quản lý Khách hàng</h1>
           <p className="text-sm text-muted-foreground">Xem, thêm, sửa thông tin khách hàng và xem lịch sử giao dịch mua hàng.</p>
@@ -396,7 +417,7 @@ export default function CustomersPage() {
                     <p className="text-xs text-muted-foreground py-2">Khách hàng chưa có hóa đơn nào.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {customerDetail.customer.invoices.map((inv: any) => (
+                      {customerDetail.customer.invoices.map((inv) => (
                         <div key={inv.id} className="flex justify-between items-center text-xs border border-border/40 p-2 rounded-lg bg-card">
                           <div>
                             <p className="font-bold text-foreground">{inv.code}</p>

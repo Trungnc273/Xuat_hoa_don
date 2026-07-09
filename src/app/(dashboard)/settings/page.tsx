@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { 
   Settings, Building2, Upload, Save, 
-  Landmark, User, ShieldAlert, Sparkles, 
+  Landmark, User, ShieldAlert,
   Mail, Phone, Globe, CheckCircle2, AlertCircle, X
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
@@ -29,7 +30,6 @@ export default function SettingsPage() {
   const { user } = useApp();
 
   const fetchSettings = async () => {
-    setLoading(true);
     try {
       const res = await fetch('/api/settings');
       if (res.ok) {
@@ -55,7 +55,7 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    fetchSettings();
+    queueMicrotask(() => void fetchSettings());
   }, []);
 
   // Xử lý upload logo
@@ -83,7 +83,7 @@ export default function SettingsPage() {
       } else {
         setErrorMsg(data.error || 'Có lỗi xảy ra khi tải logo');
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('Không thể kết nối đến máy chủ');
     } finally {
       setUploading(false);
@@ -117,11 +117,11 @@ export default function SettingsPage() {
       const data = await res.json();
       if (res.ok) {
         setSuccessMsg('Cập nhật cấu hình doanh nghiệp thành công!');
-        fetchSettings();
+        void fetchSettings();
       } else {
         setErrorMsg(data.error || 'Lỗi khi cập nhật cài đặt');
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('Lỗi kết nối máy chủ');
     } finally {
       setSubmitting(false);
@@ -315,7 +315,7 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row gap-6 items-center">
             {logo ? (
               <div className="relative h-28 w-28 rounded-2xl border border-border overflow-hidden bg-muted flex items-center justify-center p-2 bg-white">
-                <img src={logo} alt="Company Logo Preview" className="max-h-full max-w-full object-contain" />
+                <Image src={logo} alt="Company Logo Preview" width={112} height={112} unoptimized className="max-h-full max-w-full object-contain" />
                 <button
                   type="button"
                   onClick={() => setLogo('')}

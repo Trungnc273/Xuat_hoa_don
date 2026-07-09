@@ -26,7 +26,6 @@ export async function GET(req: Request) {
     });
 
     const receivables = unpaidInvoices.map((inv) => {
-      const isOverdue = inv.date && inv.createdAt; // Check if past due date
       // Tính ngày đến hạn (mặc định 30 ngày kể từ ngày xuất nếu không có)
       const dueDate = inv.date ? new Date(inv.date.getTime() + 30 * 24 * 60 * 60 * 1000) : new Date();
       const overdueDays = now.getTime() > dueDate.getTime() 
@@ -50,15 +49,6 @@ export async function GET(req: Request) {
     });
 
     // 2. Phải trả cho nhà cung cấp (Phiếu chi đã lập)
-    const paymentsToSuppliers = await prisma.payment.findMany({
-      include: {
-        supplier: {
-          select: { code: true, name: true, company: true },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
     const payablesSummary = await prisma.supplier.findMany({
       select: {
         id: true,

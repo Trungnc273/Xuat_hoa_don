@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 // GET: Lấy toàn bộ nhật ký dịch chuyển kho (có phân trang, lọc theo kho, kiểu di chuyển)
 export async function GET(req: Request) {
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.StockMovementWhereInput = {};
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { handleError } from '@/server/http';
 import { stockAdjustSchema } from '@/server/validators/catalog';
 import prisma from '@/lib/prisma';
-import { verifyAuth } from '@/lib/auth';
 import { requirePermission } from '@/server/rbac';
 
 // POST: Thực hiện điều chỉnh hoặc nhập/xuất kho thủ công
@@ -99,7 +98,7 @@ export async function POST(req: Request) {
       product: result.product,
       movement: result.movement,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleError('POST Stock Adjust', error);
   }
 }

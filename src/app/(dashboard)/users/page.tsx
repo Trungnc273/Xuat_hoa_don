@@ -40,8 +40,6 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
 
   const loadUsers = async () => {
-    setLoading(true);
-    setError('');
     try {
       const res = await fetch('/api/users');
       const data = await res.json();
@@ -55,7 +53,7 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    loadUsers();
+    queueMicrotask(() => void loadUsers());
   }, []);
 
   const flash = (msg: string) => {

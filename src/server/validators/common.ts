@@ -31,6 +31,7 @@ export const lineItem = z.object({
   productId: z.string().uuid('productId không hợp lệ').nullish(),
   productName: z.string().trim().min(1, 'Tên sản phẩm là bắt buộc'),
   productSku: optionalStr,
+  description: optionalStr,
   unitPrice: z.coerce.number({ message: 'Phải là số' }).min(0, 'Đơn giá không được âm'),
   vatRate: percent.default(10),
   discountRate: percent.default(0),

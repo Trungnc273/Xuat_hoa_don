@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
-  Plus, Search, Landmark, FileText, 
-  Calendar, User, X, AlertCircle, ChevronLeft, ChevronRight
+  Plus, Search, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -48,8 +47,7 @@ export default function ReceiptsPage() {
 
   const { user } = useApp();
 
-  const fetchReceipts = async () => {
-    setLoading(true);
+  const fetchReceipts = useCallback(async () => {
     try {
       const res = await fetch(`/api/receipts?search=${search}&page=${page}&limit=10`);
       if (res.ok) {
@@ -62,7 +60,7 @@ export default function ReceiptsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   const fetchUnpaidInvoices = async () => {
     try {
@@ -77,19 +75,20 @@ export default function ReceiptsPage() {
   };
 
   useEffect(() => {
-    fetchReceipts();
-  }, [page]);
+    queueMicrotask(() => void fetchReceipts());
+  }, [fetchReceipts]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchUnpaidInvoices();
+      queueMicrotask(() => void fetchUnpaidInvoices());
     }
   }, [isOpen]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchReceipts();
+    void fetchReceipts();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,7 +123,7 @@ export default function ReceiptsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi kết nối máy chủ');
     }
   };

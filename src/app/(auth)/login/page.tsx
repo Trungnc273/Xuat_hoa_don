@@ -45,7 +45,7 @@ function LoginForm() {
         await refreshUser(); // Cập nhật trạng thái người dùng trong Context
         router.push(callbackUrl);
       }
-    } catch (err) {
+    } catch {
       setError('Không thể kết nối đến máy chủ');
     } finally {
       setSubmitting(false);

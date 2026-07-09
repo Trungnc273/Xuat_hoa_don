@@ -3,12 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
-  Landmark, AlertTriangle, AlertCircle, Phone, 
-  Calendar, CheckCircle, Clock, ChevronRight,
+  AlertTriangle,
+  CheckCircle, Clock, ChevronRight,
   TrendingDown, TrendingUp
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useApp } from '@/context/AppContext';
 
 interface Receivable {
   id: string;
@@ -51,10 +50,7 @@ export default function DebtsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'receivables' | 'payables'>('receivables');
 
-  const { user } = useApp();
-
   const fetchDebtData = async () => {
-    setLoading(true);
     try {
       const res = await fetch('/api/debts');
       if (res.ok) {
@@ -69,7 +65,7 @@ export default function DebtsPage() {
   };
 
   useEffect(() => {
-    fetchDebtData();
+    queueMicrotask(() => void fetchDebtData());
   }, []);
 
   if (loading) {

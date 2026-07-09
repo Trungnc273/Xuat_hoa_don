@@ -23,9 +23,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Đóng menu di động khi chuyển trang
   useEffect(() => {
-    setMobileSidebarOpen(false);
-    setNotificationsOpen(false);
-    setUserMenuOpen(false);
+    queueMicrotask(() => {
+      setMobileSidebarOpen(false);
+      setNotificationsOpen(false);
+      setUserMenuOpen(false);
+    });
   }, [pathname]);
 
   // Nếu đang tải thông tin user, hiện màn hình chờ

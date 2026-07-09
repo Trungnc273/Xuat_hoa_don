@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
-  Plus, Search, Landmark, FileText, 
-  Calendar, User, X, AlertCircle, ChevronLeft, ChevronRight
+  Plus, Search, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -45,8 +44,7 @@ export default function PaymentsPage() {
 
   const { user } = useApp();
 
-  const fetchPayments = async () => {
-    setLoading(true);
+  const fetchPayments = useCallback(async () => {
     try {
       const res = await fetch(`/api/payments?search=${search}&page=${page}&limit=10`);
       if (res.ok) {
@@ -59,7 +57,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   const fetchSuppliers = async () => {
     try {
@@ -74,19 +72,20 @@ export default function PaymentsPage() {
   };
 
   useEffect(() => {
-    fetchPayments();
-  }, [page]);
+    queueMicrotask(() => void fetchPayments());
+  }, [fetchPayments]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchSuppliers();
+      queueMicrotask(() => void fetchSuppliers());
     }
   }, [isOpen]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchPayments();
+    void fetchPayments();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,7 +120,7 @@ export default function PaymentsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi kết nối máy chủ');
     }
   };

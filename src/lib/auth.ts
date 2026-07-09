@@ -42,7 +42,7 @@ export function verifyJWT(token: string): { userId: string; username: string; ro
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; username: string; role: string };
     return decoded ?? null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -75,7 +75,7 @@ export async function verifyAuth(req: Request): Promise<{ userId: string; userna
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

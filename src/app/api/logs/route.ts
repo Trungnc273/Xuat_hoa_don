@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 // GET: Lấy nhật ký hoạt động (Chỉ dành cho ADMIN)
 export async function GET(req: Request) {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ActivityLogWhereInput = {};
     if (search) {
       where.OR = [
         { username: { contains: search, mode: 'insensitive' } },

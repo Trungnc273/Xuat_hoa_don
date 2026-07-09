@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ArrowLeft, Printer, FileText, FileSpreadsheet, 
-  Send, Sparkles, CheckCircle2, AlertCircle, RefreshCw
+  ArrowLeft, Printer,
+  CheckCircle2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -14,6 +15,7 @@ interface QuotationItem {
   id: string;
   productName: string;
   productSku: string | null;
+  description: string | null;
   unitPrice: number;
   vatRate: number;
   discountRate: number;
@@ -71,8 +73,7 @@ export default function QuotationDetailPage() {
   const router = useRouter();
   const { user } = useApp();
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
     try {
       const [resQ, resS] = await Promise.all([
         fetch(`/api/quotations/${id}`),
@@ -90,16 +91,16 @@ export default function QuotationDetailPage() {
         const data = await resS.json();
         setSetting(data.setting);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchData();
-  }, [id]);
+    queueMicrotask(() => void fetchData());
+  }, [fetchData]);
 
   const handlePrint = () => {
     window.print();
@@ -121,7 +122,7 @@ export default function QuotationDetailPage() {
       } else {
         alert(data.error || 'Có lỗi xảy ra khi chuyển đổi');
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện chuyển đổi');
     } finally {
       setConverting(false);
@@ -226,7 +227,7 @@ export default function QuotationDetailPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-gray-200 pb-6">
           <div className="space-y-1">
             {setting?.logo && (
-              <img src={setting.logo} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
+              <Image src={setting.logo} alt="Company Logo" width={180} height={48} unoptimized className="h-12 w-auto mb-2 object-contain" />
             )}
             <h2 className="text-base font-extrabold tracking-tight uppercase">{setting?.companyName || 'Công ty Cổ phần Giải pháp Công nghệ SolTech'}</h2>
             <p className="text-xs text-gray-600 font-semibold">Mã số thuế: {setting?.taxCode || '0101234567'}</p>
@@ -267,6 +268,7 @@ export default function QuotationDetailPage() {
               <tr className="border-b border-gray-300 bg-gray-100 text-gray-700 font-bold">
                 <th className="py-2.5 px-2 w-10 text-center">STT</th>
                 <th className="py-2.5 px-2">Tên hàng hóa, dịch vụ</th>
+                <th className="py-2.5 px-2">Mô tả / Thông số</th>
                 <th className="py-2.5 px-2 w-16 text-center">ĐVT</th>
                 <th className="py-2.5 px-2 w-16 text-center">SL</th>
                 <th className="py-2.5 px-2 w-28 text-right">Đơn giá</th>
@@ -282,6 +284,9 @@ export default function QuotationDetailPage() {
                   <td className="py-2.5 px-2">
                     <p className="font-bold text-gray-800">{item.productName}</p>
                     {item.productSku && <p className="text-[10px] text-gray-500 font-mono mt-0.5">SKU: {item.productSku}</p>}
+                  </td>
+                  <td className="py-2.5 px-2 text-gray-600 whitespace-pre-line">
+                    {item.description || '—'}
                   </td>
                   <td className="py-2.5 px-2 text-center text-gray-600">Cái</td>
                   <td className="py-2.5 px-2 text-center font-semibold text-gray-800">{item.quantity}</td>

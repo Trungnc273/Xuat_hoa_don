@@ -4,6 +4,7 @@ import { createQuotationSchema } from '@/server/validators/sales';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { generateDocumentCode } from '@/lib/codegen';
+import type { Prisma } from '@prisma/client';
 
 // 1. GET: Danh sách báo giá
 export async function GET(req: Request) {
@@ -22,11 +23,12 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.QuotationWhereInput = {};
     if (search) {
       where.OR = [
         { code: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { customer: { phone: { contains: search, mode: 'insensitive' } } },
         { creator: { username: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -50,7 +52,7 @@ export async function GET(req: Request) {
       take: limit,
       include: {
         customer: {
-          select: { code: true, name: true, company: true },
+          select: { code: true, name: true, company: true, phone: true },
         },
         creator: {
           select: { username: true },
@@ -99,11 +101,11 @@ export async function POST(req: Request) {
     let vatAmount = 0;
     let total = 0;
 
-    const itemsData = items.map((item: any) => {
-      const unitPrice = parseFloat(item.unitPrice || 0);
-      const quantity = parseInt(item.quantity || 1);
-      const vatRate = parseFloat(item.vatRate || 10);
-      const discountRate = parseFloat(item.discountRate || 0);
+    const itemsData = items.map((item) => {
+      const unitPrice = Number(item.unitPrice || 0);
+      const quantity = Number(item.quantity || 1);
+      const vatRate = Number(item.vatRate || 10);
+      const discountRate = Number(item.discountRate || 0);
 
       const itemSubtotal = unitPrice * quantity;
       const itemDiscount = itemSubtotal * (discountRate / 100);
@@ -120,6 +122,7 @@ export async function POST(req: Request) {
         productId: item.productId || null,
         productName: item.productName,
         productSku: item.productSku || null,
+        description: item.description || null,
         unitPrice,
         vatRate,
         discountRate,

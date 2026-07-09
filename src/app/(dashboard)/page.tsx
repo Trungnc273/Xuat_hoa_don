@@ -4,16 +4,15 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/context/AppContext';
 import { 
-  TrendingUp, FileText, Users, ShoppingBag, 
-  AlertTriangle, Receipt, CreditCard, ChevronRight,
-  ArrowUpRight, ArrowDownRight, Clock
+  TrendingUp, FileText,
+  AlertTriangle, Receipt, ChevronRight,
+  Clock, Calendar
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, BarChart, Bar, 
-  PieChart, Pie, Cell, Legend
+  Tooltip, ResponsiveContainer
 } from 'recharts';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 interface Counters {
   totalRevenue: number;
@@ -32,6 +31,16 @@ interface ChartItem {
   total?: number;
 }
 
+interface RecentDocument {
+  id: string;
+  code: string;
+  total: number;
+  status: string;
+  customer: {
+    name: string;
+  };
+}
+
 interface DashboardData {
   counters: Counters;
   charts: {
@@ -42,8 +51,8 @@ interface DashboardData {
     topCustomers: { name: string; company: string; total: number }[];
   };
   recent: {
-    invoices: any[];
-    quotations: any[];
+    invoices: RecentDocument[];
+    quotations: RecentDocument[];
   };
 }
 
@@ -53,12 +62,19 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [chartType, setChartType] = useState<'day' | 'month'>('day');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const { user } = useApp();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setLoading(true);
       try {
-        const res = await fetch('/api/dashboard');
+        const params = new URLSearchParams();
+        if (dateFrom) params.set('from', dateFrom);
+        if (dateTo) params.set('to', dateTo);
+        const query = params.toString();
+        const res = await fetch(`/api/dashboard${query ? `?${query}` : ''}`);
         if (res.ok) {
           const json = await res.json();
           setData(json);
@@ -71,7 +87,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [dateFrom, dateTo]);
 
   if (loading) {
     return (
@@ -94,7 +110,12 @@ export default function DashboardPage() {
 
   const { counters, charts, recent } = data;
 
-  const currentRevenueData = chartType === 'day' ? charts.revenueByDay : charts.revenueByMonth;
+  const isCustomDateRange = Boolean(dateFrom || dateTo);
+  const currentRevenueData = isCustomDateRange
+    ? charts.revenueByDay
+    : chartType === 'day'
+      ? charts.revenueByDay
+      : charts.revenueByMonth;
 
   return (
     <div className="space-y-6">
@@ -187,23 +208,54 @@ export default function DashboardPage() {
             <h3 className="text-lg font-bold">Báo cáo doanh thu thực thu</h3>
             <p className="text-xs text-muted-foreground">Thống kê theo các phiếu thu đã xác nhận thanh toán thành công</p>
           </div>
-          <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
-            <button
-              onClick={() => setChartType('day')}
-              className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
-                chartType === 'day' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              30 ngày qua
-            </button>
-            <button
-              onClick={() => setChartType('month')}
-              className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
-                chartType === 'month' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              12 tháng qua
-            </button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-xs">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="bg-transparent outline-none"
+                aria-label="Từ ngày"
+              />
+              <span className="text-muted-foreground">-</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="bg-transparent outline-none"
+                aria-label="Đến ngày"
+              />
+              {isCustomDateRange && (
+                <button
+                  type="button"
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="rounded px-2 py-1 font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  Xóa
+                </button>
+              )}
+            </div>
+            <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
+              <button
+                onClick={() => setChartType('day')}
+                disabled={isCustomDateRange}
+                className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  chartType === 'day' && !isCustomDateRange ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                30 ngày qua
+              </button>
+              <button
+                onClick={() => setChartType('month')}
+                disabled={isCustomDateRange}
+                className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  chartType === 'month' && !isCustomDateRange ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                12 tháng qua
+              </button>
+            </div>
           </div>
         </div>
 
@@ -232,7 +284,7 @@ export default function DashboardPage() {
                 axisLine={false}
               />
               <Tooltip 
-                formatter={(value: any) => [formatCurrency(value), 'Doanh thu']}
+                formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Doanh thu']}
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   borderColor: 'hsl(var(--border))',

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { Prisma } from '@prisma/client';
 
 // 1. GET: Chi tiết sản phẩm và lịch sử luân chuyển kho
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -91,9 +92,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     });
 
     return NextResponse.json({ message: 'Cập nhật sản phẩm thành công', product: updatedProduct });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Lỗi PUT Product:', error);
-    if (error.code === 'P2002') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'Mã SKU hoặc Barcode đã tồn tại trong hệ thống' }, { status: 400 });
     }
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });

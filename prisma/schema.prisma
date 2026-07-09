@@ -199,6 +199,7 @@ model QuotationItem {
   productId    String?
   productName  String
   productSku   String?
+  description  String?
   unitPrice    Float
   vatRate      Float     @default(10)
   discountRate Float     @default(0)

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
-  Plus, Search, Warehouse, FileText, 
-  ArrowUpRight, ArrowDownRight, RefreshCw, 
-  X, AlertCircle, ChevronLeft, ChevronRight
+  Warehouse, RefreshCw,
+  X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -75,7 +74,6 @@ export default function StockPage() {
   const { user } = useApp();
 
   const fetchWarehouses = async () => {
-    setLoadingWarehouses(true);
     try {
       const res = await fetch('/api/warehouses');
       if (res.ok) {
@@ -92,8 +90,7 @@ export default function StockPage() {
     }
   };
 
-  const fetchMovements = async () => {
-    setLoadingMovements(true);
+  const fetchMovements = useCallback(async () => {
     try {
       const res = await fetch(`/api/stock-movements?type=${typeFilter}&warehouseId=${whFilter}&page=${page}&limit=10`);
       if (res.ok) {
@@ -106,7 +103,7 @@ export default function StockPage() {
     } finally {
       setLoadingMovements(false);
     }
-  };
+  }, [page, typeFilter, whFilter]);
 
   const fetchProductsList = async () => {
     try {
@@ -124,13 +121,15 @@ export default function StockPage() {
   };
 
   useEffect(() => {
-    fetchWarehouses();
-    fetchProductsList();
+    queueMicrotask(() => {
+      void fetchWarehouses();
+      void fetchProductsList();
+    });
   }, []);
 
   useEffect(() => {
-    fetchMovements();
-  }, [page, typeFilter, whFilter]);
+    queueMicrotask(() => void fetchMovements());
+  }, [fetchMovements]);
 
   // Submit phiếu điều chỉnh kho
   const handleAdjustSubmit = async (e: React.FormEvent) => {
@@ -162,12 +161,12 @@ export default function StockPage() {
         setAdjQuantity('');
         setAdjReason('');
         setAdjNote('');
-        fetchMovements();
-        fetchProductsList(); // Cập nhật lại tồn kho trong danh sách chọn
+        void fetchMovements();
+        void fetchProductsList(); // Cập nhật lại tồn kho trong danh sách chọn
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };
@@ -199,11 +198,11 @@ export default function StockPage() {
         setWhName('');
         setWhAddress('');
         setWhDescription('');
-        fetchWarehouses();
+        void fetchWarehouses();
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi hệ thống');
     }
   };

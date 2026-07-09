@@ -11,19 +11,31 @@ export async function GET(req: Request) {
     }
 
     // Cache 30s — số liệu tổng hợp không cần realtime tuyệt đối (SPEC GĐ4, FR-1)
-    const payload = await cached('dashboard', 30_000, async () => {
+    const { searchParams } = new URL(req.url);
+    const from = searchParams.get('from') || '';
+    const to = searchParams.get('to') || '';
+    const fromDate = from ? new Date(`${from}T00:00:00`) : null;
+    const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
+    const selectedDateRange = {
+      ...(fromDate && !Number.isNaN(fromDate.getTime()) ? { gte: fromDate } : {}),
+      ...(toDate && !Number.isNaN(toDate.getTime()) ? { lte: toDate } : {}),
+    };
+    const hasSelectedDateRange = Object.keys(selectedDateRange).length > 0;
+    const invoiceDateWhere = hasSelectedDateRange ? { date: selectedDateRange } : {};
+
+    const payload = await cached(`dashboard:${from || 'all'}:${to || 'all'}`, 30_000, async () => {
 
     // 1. Lấy số lượng và tổng số liệu cơ bản
     const totalCustomers = await prisma.customer.count();
     const totalProducts = await prisma.product.count();
     const totalQuotations = await prisma.quotation.count();
     const totalInvoices = await prisma.invoice.count({
-      where: { status: { not: 'CANCELLED' } }
+      where: { status: { not: 'CANCELLED' }, ...invoiceDateWhere }
     });
 
     // Tổng doanh thu = Tổng số tiền đã thanh toán trên các hóa đơn không bị hủy
     const invoiceRevenueAgg = await prisma.invoice.aggregate({
-      where: { status: { not: 'CANCELLED' } },
+      where: { status: { not: 'CANCELLED' }, ...invoiceDateWhere },
       _sum: {
         paidAmount: true,
         remainingAmount: true,
@@ -37,6 +49,7 @@ export async function GET(req: Request) {
     const unpaidInvoicesCount = await prisma.invoice.count({
       where: {
         status: { in: ['UNPAID', 'PARTIALLY_PAID'] },
+        ...invoiceDateWhere,
       },
     });
 
@@ -46,7 +59,7 @@ export async function GET(req: Request) {
 
     const invoicesLast30Days = await prisma.invoice.findMany({
       where: {
-        date: { gte: thirtyDaysAgo },
+        date: hasSelectedDateRange ? selectedDateRange : { gte: thirtyDaysAgo },
         status: { not: 'CANCELLED' },
       },
       select: {
@@ -57,9 +70,15 @@ export async function GET(req: Request) {
 
     // Gom nhóm doanh thu theo ngày
     const revenueByDayMap: { [key: string]: number } = {};
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    const chartStartDate = fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : thirtyDaysAgo;
+    const chartEndDate = toDate && !Number.isNaN(toDate.getTime()) ? toDate : new Date();
+    const dayCount = Math.min(
+      366,
+      Math.max(1, Math.ceil((chartEndDate.getTime() - chartStartDate.getTime()) / 86_400_000) + 1),
+    );
+    for (let i = 0; i < dayCount; i++) {
+      const d = new Date(chartStartDate);
+      d.setDate(chartStartDate.getDate() + i);
       const dateStr = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
       revenueByDayMap[dateStr] = 0;
     }
@@ -125,7 +144,7 @@ export async function GET(req: Request) {
     // 4. Top sản phẩm bán chạy nhất
     const invoiceItems = await prisma.invoiceItem.findMany({
       where: {
-        invoice: { status: { not: 'CANCELLED' } }
+        invoice: { status: { not: 'CANCELLED' }, ...invoiceDateWhere }
       },
       select: {
         productName: true,
@@ -155,7 +174,7 @@ export async function GET(req: Request) {
 
     // 5. Khách hàng mua nhiều nhất
     const customerInvoices = await prisma.invoice.findMany({
-      where: { status: { not: 'CANCELLED' } },
+      where: { status: { not: 'CANCELLED' }, ...invoiceDateWhere },
       select: {
         total: true,
         customer: {

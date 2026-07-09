@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
-  Plus, Search, Landmark, FileText, 
-  Calendar, User, X, AlertCircle, ChevronLeft, ChevronRight,
-  TrendingDown
+  Plus, Search, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -40,8 +38,7 @@ export default function ExpensesPage() {
 
   const { user } = useApp();
 
-  const fetchExpenses = async () => {
-    setLoading(true);
+  const fetchExpenses = useCallback(async () => {
     try {
       const res = await fetch(`/api/expenses?search=${search}&category=${categoryFilter}&page=${page}&limit=10`);
       if (res.ok) {
@@ -54,16 +51,17 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryFilter, page, search]);
 
   useEffect(() => {
-    fetchExpenses();
-  }, [page, categoryFilter]);
+    queueMicrotask(() => void fetchExpenses());
+  }, [fetchExpenses]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchExpenses();
+    void fetchExpenses();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,7 +96,7 @@ export default function ExpensesPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi kết nối máy chủ');
     }
   };

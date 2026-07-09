@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt, chạy & demo
 
-> Dành cho người mới nhận dự án hoặc cài cho khách hàng mới. Cập nhật: 03/07/2026 (sau GĐ4).
+> Dành cho người mới nhận dự án hoặc cài cho khách hàng mới. Cập nhật: 09/07/2026 (sau nâng cấp GĐ1: dashboard lọc ngày, báo giá theo SĐT, mô tả từng dòng báo giá, ẩn barcode).
 
 ## 0. Yêu cầu máy
 
@@ -31,6 +31,15 @@ docker compose up -d db      # bật PostgreSQL (port 5433)
 npx prisma migrate dev       # tạo bảng
 npx prisma db seed           # dữ liệu mẫu + tài khoản mặc định
 npm run dev                  # → http://localhost:3000
+```
+
+**Cập nhật code mới trên máy dev đã cài sẵn:**
+```bash
+git pull
+npm install                  # chỉ cần khi package-lock.json thay đổi
+docker compose up -d db
+npx prisma migrate dev       # áp migration mới, ví dụ mô tả từng dòng báo giá
+npm run dev
 ```
 
 **Tài khoản mẫu sau khi seed** (đổi hết mật khẩu khi dùng thật):
@@ -89,6 +98,8 @@ docker exec hoadon-db psql -U hoadon web_xuat_hoa_don -c "SELECT username FROM u
 git pull
 docker compose --profile prod up -d --build   # migrate chạy tự động trước khi app lên
 ```
+
+Ghi chú: bản cập nhật 09/07/2026 có migration thêm trường mô tả/thông số cho từng dòng báo giá. Lệnh production ở trên đã chạy migrate tự động; máy dev cần chạy `npx prisma migrate dev` sau khi pull.
 
 ---
 

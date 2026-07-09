@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
-  Plus, Search, Edit, Trash2, Eye, 
-  Receipt, ArrowRight, Calendar, User, 
+  Plus, Search, Eye,
   ChevronLeft, ChevronRight, Landmark, XCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -33,8 +32,7 @@ export default function InvoicesPage() {
   
   const { user } = useApp();
 
-  const fetchInvoices = async () => {
-    setLoading(true);
+  const fetchInvoices = useCallback(async () => {
     try {
       const res = await fetch(`/api/invoices?search=${search}&status=${statusFilter}&page=${page}&limit=10`);
       if (res.ok) {
@@ -47,16 +45,17 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
-    fetchInvoices();
-  }, [page, statusFilter]);
+    queueMicrotask(() => void fetchInvoices());
+  }, [fetchInvoices]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchInvoices();
+    void fetchInvoices();
   };
 
   // Hủy hóa đơn (đổi trạng thái sang CANCELLED, Backend tự động hoàn kho)
@@ -75,7 +74,7 @@ export default function InvoicesPage() {
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện hủy hóa đơn');
     }
   };

@@ -6,6 +6,7 @@ import { handleError } from '@/server/http';
 import { logActivity } from '@/server/activity-log';
 import { createInvoiceSchema } from '@/server/validators/sales';
 import { computeTotals, createInvoiceCore } from '@/server/services/invoice.service';
+import type { Prisma } from '@prisma/client';
 
 // 1. GET: Danh sách hóa đơn (có phân trang, lọc trạng thái, tìm kiếm)
 export async function GET(req: Request) {
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.InvoiceWhereInput = {};
     if (search) {
       where.OR = [
         { code: { contains: search, mode: 'insensitive' } },

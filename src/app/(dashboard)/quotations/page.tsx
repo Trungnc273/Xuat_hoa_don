@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Plus, Search, Edit, Trash2, Eye, 
-  FileText, ArrowRight, Calendar, User, 
-  ChevronLeft, ChevronRight, CheckCircle2
+  ArrowRight,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useApp } from '@/context/AppContext';
 
 interface Quotation {
   id: string;
   code: string;
   customerId: string;
-  customer: { name: string; company: string | null };
+  customer: { name: string; company: string | null; phone: string | null };
   date: string;
   dueDate: string | null;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
@@ -24,6 +24,7 @@ interface Quotation {
 }
 
 export default function QuotationsPage() {
+  const router = useRouter();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -31,10 +32,7 @@ export default function QuotationsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   
-  const { user } = useApp();
-
-  const fetchQuotations = async () => {
-    setLoading(true);
+  const fetchQuotations = useCallback(async () => {
     try {
       const res = await fetch(`/api/quotations?search=${search}&status=${statusFilter}&page=${page}&limit=10`);
       if (res.ok) {
@@ -47,16 +45,17 @@ export default function QuotationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
-    fetchQuotations();
-  }, [page, statusFilter]);
+    queueMicrotask(() => void fetchQuotations());
+  }, [fetchQuotations]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchQuotations();
+    void fetchQuotations();
   };
 
   const handleDelete = async (id: string) => {
@@ -69,7 +68,7 @@ export default function QuotationsPage() {
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Không thể thực hiện xóa');
     }
   };
@@ -81,11 +80,11 @@ export default function QuotationsPage() {
       const data = await res.json();
       if (res.ok) {
         alert('Chuyển đổi thành công! Chuyển hướng sang hóa đơn mới lập...');
-        window.location.href = `/invoices/${data.invoice.id}`;
+        router.push(`/invoices/${data.invoice.id}`);
       } else {
         alert(data.error);
       }
-    } catch (err) {
+    } catch {
       alert('Đã xảy ra lỗi khi chuyển đổi');
     }
   };
@@ -94,7 +93,7 @@ export default function QuotationsPage() {
     <div className="space-y-6">
       
       {/* HEADER VÀ NÚT TẠO MỚI */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col items-start gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Quản lý Báo giá</h1>
           <p className="text-sm text-muted-foreground">Lập báo giá gửi khách hàng, theo dõi phản hồi và chuyển đổi trực tiếp thành Hóa đơn.</p>
@@ -115,7 +114,7 @@ export default function QuotationsPage() {
             <Search className="absolute inset-y-0 left-3 h-full w-4 text-muted-foreground flex items-center" />
             <input
               type="text"
-              placeholder="Tìm theo số báo giá, khách hàng..."
+              placeholder="Tìm theo số báo giá, khách hàng, SĐT..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:border-foreground focus:ring-1 focus:ring-foreground focus:outline-none transition-colors"
@@ -176,6 +175,7 @@ export default function QuotationsPage() {
                     <td className="p-3 font-semibold text-foreground">
                       {q.customer.name}
                       {q.customer.company && <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate max-w-[150px]">{q.customer.company}</p>}
+                      {q.customer.phone && <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{q.customer.phone}</p>}
                     </td>
                     <td className="p-3 text-muted-foreground">{formatDate(q.date)}</td>
                     <td className="p-3 text-muted-foreground">{q.dueDate ? formatDate(q.dueDate) : '—'}</td>

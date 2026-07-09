@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { requirePermission } from '@/server/rbac';
 import { generateDocumentCode } from '@/lib/codegen';
+import { Prisma } from '@prisma/client';
 
 // 1. GET: Lấy danh sách sản phẩm
 export async function GET(req: Request) {
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ProductWhereInput = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -147,11 +148,11 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ message: 'Tạo sản phẩm thành công', product: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Lỗi POST Product:', error);
     // Phân biệt đúng trường bị trùng theo error.meta.target — không gộp chung "SKU hoặc Barcode"
     // cho cả trường hợp trùng mã `code` tự sinh (04/07/2026 — xem CLAUDE.md bài học)
-    if (error.code === 'P2002') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const target = (error.meta?.target as string[] | undefined) || [];
       if (target.includes('code')) {
         return NextResponse.json(

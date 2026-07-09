@@ -29,25 +29,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 1. Kiểm tra theme và tài khoản đăng nhập khi khởi động
-  useEffect(() => {
-    // A. Thiết lập theme
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const activeTheme = savedTheme || systemTheme;
-    setTheme(activeTheme);
-    if (activeTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
-    // B. Lấy thông tin tài khoản đăng nhập
-    refreshUser();
-  }, []);
-
   const refreshUser = async () => {
-    setLoading(true);
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
@@ -63,6 +45,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   };
+
+  // 1. Kiểm tra theme và tài khoản đăng nhập khi khởi động
+  useEffect(() => {
+    // A. Thiết lập theme
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const activeTheme = savedTheme || systemTheme;
+    queueMicrotask(() => setTheme(activeTheme));
+    if (activeTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // B. Lấy thông tin tài khoản đăng nhập
+    queueMicrotask(() => void refreshUser());
+  }, []);
 
   // 2. Chuyển đổi Dark/Light mode
   const toggleTheme = () => {

@@ -205,7 +205,7 @@ export default function NewInvoicePage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi kết nối');
     } finally {
       setSubmitting(false);
@@ -306,7 +306,7 @@ export default function NewInvoicePage() {
 
           {items.length === 0 ? (
             <div className="text-center py-10 text-xs text-muted-foreground">
-              Chưa có sản phẩm nào. Nhấn "Thêm dòng sản phẩm" để chọn hàng hóa bán ra.
+              Chưa có sản phẩm nào. Nhấn &quot;Thêm dòng sản phẩm&quot; để chọn hàng hóa bán ra.
             </div>
           ) : (
             <div className="overflow-x-auto">

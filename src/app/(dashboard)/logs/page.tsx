@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
-  Search, History, AlertCircle, ShieldAlert,
-  Clock, Shield, User, ChevronLeft, ChevronRight
+  Search, ShieldAlert,
+  Clock, User, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -28,8 +28,7 @@ export default function LogsPage() {
 
   const { user } = useApp();
 
-  const fetchLogs = async () => {
-    setLoading(true);
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/logs?search=${search}&page=${page}&limit=20`);
       if (res.ok) {
@@ -42,18 +41,19 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
-      fetchLogs();
+      queueMicrotask(() => void fetchLogs());
     }
-  }, [page]);
+  }, [fetchLogs, user?.role]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setPage(1);
-    fetchLogs();
+    void fetchLogs();
   };
 
   const getActionColor = (action: string) => {

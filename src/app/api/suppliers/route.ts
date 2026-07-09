@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
 import { requirePermission } from '@/server/rbac';
 import { generateDocumentCode } from '@/lib/codegen';
+import type { Prisma } from '@prisma/client';
 
 // 1. GET: Lấy danh sách nhà cung cấp
 export async function GET(req: Request) {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.SupplierWhereInput = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
