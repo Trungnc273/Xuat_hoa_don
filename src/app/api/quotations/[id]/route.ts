@@ -80,7 +80,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // Nếu danh sách sản phẩm thay đổi, chúng ta cần tính lại toàn bộ
     const updateData: Prisma.QuotationUncheckedUpdateInput = {};
     if (customerId) updateData.customerId = customerId;
-    if (dueDate) updateData.dueDate = new Date(dueDate);
+    if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
     if (status) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
 
@@ -142,6 +142,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           include: {
             items: true,
             customer: true,
+            creator: {
+              select: { username: true, email: true },
+            },
           },
         });
       } else {
@@ -152,6 +155,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           include: {
             items: true,
             customer: true,
+            creator: {
+              select: { username: true, email: true },
+            },
           },
         });
       }

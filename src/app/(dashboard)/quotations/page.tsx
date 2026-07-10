@@ -206,7 +206,7 @@ export default function QuotationsPage() {
                         </Link>
                         {['DRAFT', 'SENT'].includes(q.status) && (
                           <Link
-                            href={`/quotations/${q.id}/edit`}
+                            href={`/quotations/${q.id}#edit`}
                             className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
                             title="Chỉnh sửa báo giá"
                           >
