@@ -52,6 +52,8 @@ interface Category {
 
 type ProductImportRow = Record<string, string | number | boolean | null | undefined>;
 
+const TIER_COLORS = ['#2563eb', '#16a34a', '#f97316', '#dc2626', '#9333ea', '#0891b2', '#64748b'];
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -144,6 +146,12 @@ export default function ProductsPage() {
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState('');
   const [inlineCategoryMode, setInlineCategoryMode] = useState(false);
+  const [isPriceTierOpen, setIsPriceTierOpen] = useState(false);
+  const [tierName, setTierName] = useState('');
+  const [tierColor, setTierColor] = useState(TIER_COLORS[0]);
+  const [tierDesc, setTierDesc] = useState('');
+  const [editingTierId, setEditingTierId] = useState<string | null>(null);
+  const [priceTierError, setPriceTierError] = useState('');
 
   // Submit Category (Add or Update)
   const handleCategorySubmit = async (e: React.FormEvent) => {
@@ -195,6 +203,67 @@ export default function ProductsPage() {
       return;
     }
     setCategoryId(value);
+  };
+
+  const handlePriceTierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPriceTierError('');
+
+    if (!tierName.trim()) {
+      setPriceTierError('Tên phân loại là bắt buộc');
+      return;
+    }
+
+    try {
+      const url = editingTierId ? `/api/customer-price-tiers/${editingTierId}` : '/api/customer-price-tiers';
+      const method = editingTierId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: tierName, color: tierColor, description: tierDesc }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setTierName('');
+        setTierColor(TIER_COLORS[0]);
+        setTierDesc('');
+        setEditingTierId(null);
+        await fetchPriceTiers();
+      } else {
+        setPriceTierError(data.error || 'Có lỗi xảy ra');
+      }
+    } catch {
+      setPriceTierError('Lỗi kết nối máy chủ');
+    }
+  };
+
+  const handlePriceTierDelete = async (tierId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa phân loại khách hàng này?')) return;
+    setPriceTierError('');
+
+    try {
+      const res = await fetch(`/api/customer-price-tiers/${tierId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        setTierPriceValues((current) => {
+          const next = { ...current };
+          delete next[tierId];
+          return next;
+        });
+        if (editingTierId === tierId) {
+          setEditingTierId(null);
+          setTierName('');
+          setTierColor(TIER_COLORS[0]);
+          setTierDesc('');
+        }
+        await fetchPriceTiers();
+      } else {
+        setPriceTierError(data.error || 'Có lỗi xảy ra khi xóa');
+      }
+    } catch {
+      setPriceTierError('Lỗi kết nối máy chủ');
+    }
   };
 
   // Delete Category
@@ -480,6 +549,44 @@ export default function ProductsPage() {
     setError('');
   };
 
+  const renderTierPriceFields = () => (
+    <div className="rounded-lg border border-border p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-foreground">Giá theo phân loại khách hàng</p>
+          <p className="text-[11px] text-muted-foreground">Mỗi phân loại có thể đặt một giá bán riêng cho sản phẩm này.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setPriceTierError(''); setIsPriceTierOpen(true); }}
+          className="shrink-0 rounded border border-border px-3 py-1.5 text-[11px] font-bold hover:bg-secondary cursor-pointer"
+        >
+          Quản lý phân loại
+        </button>
+      </div>
+
+      {priceTiers.length === 0 ? (
+        <div className="rounded border border-dashed border-border p-3 text-[11px] text-muted-foreground">
+          Chưa có phân loại khách hàng. Tạo phân loại trước, sau đó các ô giá sẽ hiện ở đây.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {priceTiers.map((tier) => (
+            <div key={tier.id}>
+              <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
+              <input
+                type="number"
+                value={tierPriceValues[tier.id] || ''}
+                onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
+                className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       
@@ -552,12 +659,20 @@ export default function ProductsPage() {
         </select>
 
         {['ADMIN', 'MANAGER'].includes(user?.role || '') && (
-          <button
-            onClick={() => { setInlineCategoryMode(false); setCategoryError(''); setIsCategoryOpen(true); }}
-            className="rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
-          >
-            Quản lý danh mục
-          </button>
+          <>
+            <button
+              onClick={() => { setInlineCategoryMode(false); setCategoryError(''); setIsCategoryOpen(true); }}
+              className="rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
+            >
+              Quản lý danh mục
+            </button>
+            <button
+              onClick={() => { setPriceTierError(''); setIsPriceTierOpen(true); }}
+              className="rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
+            >
+              Quản lý phân loại khách
+            </button>
+          </>
         )}
       </div>
 
@@ -739,21 +854,7 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {priceTiers.length > 0 && (
-                <div className="grid grid-cols-2 gap-2">
-                  {priceTiers.map((tier) => (
-                    <div key={tier.id}>
-                      <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
-                      <input
-                        type="number"
-                        value={tierPriceValues[tier.id] || ''}
-                        onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
-                        className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+              {renderTierPriceFields()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -869,21 +970,7 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {priceTiers.length > 0 && (
-                <div className="grid grid-cols-2 gap-2">
-                  {priceTiers.map((tier) => (
-                    <div key={tier.id}>
-                      <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
-                      <input
-                        type="number"
-                        value={tierPriceValues[tier.id] || ''}
-                        onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
-                        className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+              {renderTierPriceFields()}
 
               <div>
                 <label className="block font-semibold mb-1">Hình ảnh sản phẩm</label>
@@ -1084,6 +1171,138 @@ export default function ProductsPage() {
                           <button
                             type="button"
                             onClick={() => handleCategoryDelete(cat.id)}
+                            className="rounded px-2 py-1 bg-destructive/10 hover:bg-destructive/20 text-destructive text-[10px] font-bold border border-destructive/20 cursor-pointer"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL QUẢN LÝ PHÂN LOẠI KHÁCH HÀNG */}
+      {isPriceTierOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl relative max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => { setIsPriceTierOpen(false); setEditingTierId(null); setTierName(''); setTierColor(TIER_COLORS[0]); setTierDesc(''); }}
+              className="absolute top-4 right-4 rounded-md p-1 hover:bg-secondary text-muted-foreground cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-1.5 text-foreground">
+              Quản lý phân loại khách hàng
+            </h3>
+
+            {priceTierError && (
+              <div className="mb-3 text-xs font-semibold text-destructive rounded bg-destructive/10 p-2.5 border border-destructive/20">
+                {priceTierError}
+              </div>
+            )}
+
+            <div className="grid gap-6 md:grid-cols-2 overflow-y-auto pr-1">
+              <form onSubmit={handlePriceTierSubmit} className="space-y-3.5 text-xs border-r border-border/60 pr-5">
+                <h4 className="font-bold text-foreground text-sm uppercase tracking-wider">
+                  {editingTierId ? 'Cập nhật phân loại' : 'Thêm phân loại mới'}
+                </h4>
+
+                <div>
+                  <label className="block font-semibold mb-1">Tên phân loại *</label>
+                  <input
+                    type="text"
+                    required
+                    value={tierName}
+                    onChange={(e) => setTierName(e.target.value)}
+                    className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
+                    placeholder="Ví dụ: Khách sỉ, Đại lý miền Bắc, VIP..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block font-semibold">Màu</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="color"
+                      value={tierColor}
+                      onChange={(e) => setTierColor(e.target.value)}
+                      className="h-9 w-12 rounded border border-border bg-card p-1 cursor-pointer"
+                    />
+                    {TIER_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setTierColor(color)}
+                        className={`h-5 w-5 rounded-full border cursor-pointer ${tierColor === color ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card' : 'border-border'}`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Mô tả</label>
+                  <textarea
+                    value={tierDesc}
+                    onChange={(e) => setTierDesc(e.target.value)}
+                    rows={3}
+                    className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button type="submit" className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 font-bold cursor-pointer">
+                    {editingTierId ? 'Lưu cập nhật' : 'Tạo mới'}
+                  </button>
+                  {editingTierId && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditingTierId(null); setTierName(''); setTierColor(TIER_COLORS[0]); setTierDesc(''); }}
+                      className="rounded px-4 py-2 border border-border text-foreground hover:bg-secondary cursor-pointer"
+                    >
+                      Hủy sửa
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto text-xs">
+                <h4 className="font-bold text-foreground text-sm uppercase tracking-wider mb-2.5">
+                  Danh sách hiện tại
+                </h4>
+
+                {priceTiers.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-6">Chưa có phân loại nào.</p>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {priceTiers.map((tier) => (
+                      <div key={tier.id} className="py-2.5 flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <span
+                            className="inline-flex max-w-[180px] rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                            style={{ backgroundColor: tier.color }}
+                          >
+                            <span className="truncate">{tier.name}</span>
+                          </span>
+                          {tier.description && <p className="text-muted-foreground text-[10px] italic">{tier.description}</p>}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingTierId(tier.id); setTierName(tier.name); setTierColor(tier.color); setTierDesc(tier.description || ''); }}
+                            className="rounded px-2 py-1 bg-secondary hover:bg-muted text-[10px] font-bold border border-border cursor-pointer text-foreground"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePriceTierDelete(tier.id)}
                             className="rounded px-2 py-1 bg-destructive/10 hover:bg-destructive/20 text-destructive text-[10px] font-bold border border-destructive/20 cursor-pointer"
                           >
                             Xóa
