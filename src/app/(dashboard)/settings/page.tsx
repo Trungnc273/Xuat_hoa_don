@@ -6,11 +6,22 @@ import Link from 'next/link';
 import { 
   Settings, Building2, Upload, Save, 
   Landmark, User, ShieldAlert,
-  Mail, Phone, Globe, CheckCircle2, AlertCircle, X
+  Mail, Phone, Globe, CheckCircle2, AlertCircle, X,
+  History, ShieldCheck
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import LogsPage from '../logs/page';
+import UsersPage from '../users/page';
 
-export default function SettingsPage() {
+type SettingsTab = 'business' | 'users' | 'logs';
+
+const settingsTabs: Array<{ id: SettingsTab; label: string; icon: React.ElementType }> = [
+  { id: 'business', label: 'Cấu hình doanh nghiệp', icon: Building2 },
+  { id: 'users', label: 'Quản lý tài khoản', icon: ShieldCheck },
+  { id: 'logs', label: 'Nhật ký hệ thống', icon: History },
+];
+
+function BusinessSettingsPanel() {
   const [logo, setLogo] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [taxCode, setTaxCode] = useState('');
@@ -152,9 +163,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl">
       
-      {/* HEADER CẤU HÌNH */}
       <div>
         <h1 className="text-xl font-bold tracking-tight">Cấu hình Doanh nghiệp</h1>
         <p className="text-sm text-muted-foreground">Thiết lập hồ sơ tổ chức, mã số thuế, đại diện pháp lý và tài khoản ngân hàng để tự sinh QR thanh toán.</p>
@@ -362,6 +372,46 @@ export default function SettingsPage() {
 
       </form>
 
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('business');
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight">Cài đặt</h1>
+        <p className="text-sm text-muted-foreground">Quản lý cấu hình doanh nghiệp, tài khoản người dùng và nhật ký hệ thống trong cùng một khu vực.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+        {settingsTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                isActive
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-card text-muted-foreground hover:bg-secondary hover:text-foreground border border-border'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'business' && <BusinessSettingsPanel />}
+      {activeTab === 'users' && <UsersPage />}
+      {activeTab === 'logs' && <LogsPage />}
     </div>
   );
 }

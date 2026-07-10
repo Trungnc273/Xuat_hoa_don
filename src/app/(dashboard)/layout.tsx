@@ -7,7 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { 
   LayoutDashboard, Users, Truck, ShoppingBag, Warehouse, 
   FileText, Receipt, Landmark, DollarSign, Settings, 
-  History, LogOut, Menu, X, Sun, Moon, Bell, ChevronRight, 
+  LogOut, Menu, X, Sun, Moon, Bell, ChevronRight,
   User as UserIcon, Sparkles 
 } from 'lucide-react';
 
@@ -60,9 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Phiếu chi (Tiền ra)', path: '/payments', icon: DollarSign, roles: ['ADMIN', 'ACCOUNTANT'] },
     { name: 'Chi phí khác', path: '/expenses', icon: DollarSign, roles: ['ADMIN', 'ACCOUNTANT'] },
     { name: 'Công nợ', path: '/debts', icon: Landmark, roles: ['ADMIN', 'ACCOUNTANT'] },
-    { name: 'Quản lý tài khoản', path: '/users', icon: UserIcon, roles: ['ADMIN'] },
-    { name: 'Cấu hình doanh nghiệp', path: '/settings', icon: Settings, roles: ['ADMIN'] },
-    { name: 'Nhật ký hệ thống', path: '/logs', icon: History, roles: ['ADMIN'] },
+    { name: 'Cài đặt', path: '/settings', icon: Settings, roles: ['ADMIN'] },
   ];
 
   // Lọc menu hiển thị
