@@ -72,12 +72,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
     }
 
+    const normalizedSku = sku !== undefined ? (String(sku).trim() || null) : existingProduct.sku;
+    const normalizedBarcode = barcode !== undefined ? (String(barcode).trim() || null) : existingProduct.barcode;
+
     const updatedProduct = await prisma.$transaction(async (tx) => {
       const product = await tx.product.update({
         where: { id },
         data: {
-          sku: sku !== undefined ? sku : existingProduct.sku,
-          barcode: barcode !== undefined ? barcode : existingProduct.barcode,
+          sku: normalizedSku,
+          barcode: normalizedBarcode,
           name: name !== undefined ? name : existingProduct.name,
           categoryId: categoryId !== undefined ? (categoryId || null) : existingProduct.categoryId,
           importPrice: importPrice !== undefined ? parseFloat(importPrice) : existingProduct.importPrice,
