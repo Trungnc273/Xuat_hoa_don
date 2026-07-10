@@ -374,7 +374,7 @@ export default function ProductsPage() {
     }
 
     // Chặn gửi trùng khi bấm nhiều lần / mạng chậm (ví dụ qua ngrok) — xem CLAUDE.md bài học 04/07/2026
-    if (saving) return;
+    if (saving || uploadingImage) return;
     setSaving(true);
 
     try {
@@ -413,7 +413,7 @@ export default function ProductsPage() {
     setError('');
 
     if (!selectedProduct) return;
-    if (saving) return;
+    if (saving || uploadingImage) return;
     setSaving(true);
 
     try {
@@ -902,7 +902,7 @@ export default function ProductsPage() {
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsAddOpen(false)} className="rounded px-4 py-2 border border-border text-foreground hover:bg-secondary cursor-pointer">Hủy</button>
-                <button type="submit" disabled={saving} className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer">{saving ? 'Đang lưu...' : 'Lưu sản phẩm'}</button>
+                <button type="submit" disabled={saving || uploadingImage} className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer">{uploadingImage ? 'Đang tải ảnh...' : saving ? 'Đang lưu...' : 'Lưu sản phẩm'}</button>
               </div>
             </form>
           </div>
@@ -1009,7 +1009,7 @@ export default function ProductsPage() {
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsEditOpen(false)} className="rounded px-4 py-2 border border-border text-foreground hover:bg-secondary cursor-pointer">Hủy</button>
-                <button type="submit" disabled={saving} className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer">{saving ? 'Đang lưu...' : 'Cập nhật sản phẩm'}</button>
+                <button type="submit" disabled={saving || uploadingImage} className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer">{uploadingImage ? 'Đang tải ảnh...' : saving ? 'Đang lưu...' : 'Cập nhật sản phẩm'}</button>
               </div>
             </form>
           </div>

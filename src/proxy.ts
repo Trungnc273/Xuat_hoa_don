@@ -55,6 +55,7 @@ export async function proxy(request: NextRequest) {
   // Bỏ qua các file tĩnh, API và asset
   const isStaticOrApi = pathname.startsWith('/_next') ||
                          pathname.startsWith('/api') ||
+                         pathname.startsWith('/uploads') ||
                          pathname.includes('/logo') ||
                          pathname.includes('/favicon.ico');
 
@@ -94,8 +95,9 @@ export const config = {
      * - api (các tuyến API)
      * - _next/static (các tệp tĩnh)
      * - _next/image (tối ưu hóa hình ảnh)
+     * - uploads (ảnh sản phẩm/ảnh tải lên)
      * - favicon.ico (icon trình duyệt)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|uploads|_next/static|_next/image|favicon.ico).*)',
   ],
 };
