@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -89,6 +89,28 @@ export default function QuotationsPage() {
     }
   };
 
+  const groupedQuotations = useMemo(() => {
+    const groups = new Map<string, { customerId: string; customer: Quotation['customer']; quotations: Quotation[]; total: number }>();
+
+    quotations.forEach((quotation) => {
+      const currentGroup = groups.get(quotation.customerId);
+      if (currentGroup) {
+        currentGroup.quotations.push(quotation);
+        currentGroup.total += quotation.total;
+        return;
+      }
+
+      groups.set(quotation.customerId, {
+        customerId: quotation.customerId,
+        customer: quotation.customer,
+        quotations: [quotation],
+        total: quotation.total,
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [quotations]);
+
   return (
     <div className="space-y-6">
       
@@ -148,7 +170,6 @@ export default function QuotationsPage() {
             <thead>
               <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
                 <th className="p-3">Số báo giá</th>
-                <th className="p-3">Khách hàng</th>
                 <th className="p-3">Ngày lập</th>
                 <th className="p-3">Hạn báo giá</th>
                 <th className="p-3">Giá trị báo giá</th>
@@ -160,80 +181,93 @@ export default function QuotationsPage() {
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">Đang tải danh sách báo giá...</td>
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">Đang tải danh sách báo giá...</td>
                 </tr>
               ) : quotations.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">Không tìm thấy báo giá nào.</td>
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">Không tìm thấy báo giá nào.</td>
                 </tr>
               ) : (
-                quotations.map((q) => (
-                  <tr key={q.id} className="hover:bg-muted/10 transition-colors">
-                    <td className="p-3 font-bold text-foreground">
-                      <Link href={`/quotations/${q.id}`} className="hover:underline">{q.code}</Link>
-                    </td>
-                    <td className="p-3 font-semibold text-foreground">
-                      {q.customer.name}
-                      {q.customer.company && <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate max-w-[150px]">{q.customer.company}</p>}
-                      {q.customer.phone && <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{q.customer.phone}</p>}
-                    </td>
-                    <td className="p-3 text-muted-foreground">{formatDate(q.date)}</td>
-                    <td className="p-3 text-muted-foreground">{q.dueDate ? formatDate(q.dueDate) : '—'}</td>
-                    <td className="p-3 font-extrabold text-foreground">{formatCurrency(q.total)}</td>
-                    <td className="p-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                        q.status === 'CONVERTED' ? 'bg-emerald-500/10 text-emerald-500' :
-                        q.status === 'SENT' ? 'bg-blue-500/10 text-blue-500' :
-                        q.status === 'ACCEPTED' ? 'bg-indigo-500/10 text-indigo-500' :
-                        q.status === 'DRAFT' ? 'bg-amber-500/10 text-amber-500' :
-                        'bg-destructive/10 text-destructive'
-                      }`}>
-                        {q.status === 'CONVERTED' ? 'Đã chuyển HĐ' :
-                         q.status === 'SENT' ? 'Đã gửi' :
-                         q.status === 'ACCEPTED' ? 'Đã duyệt' :
-                         q.status === 'DRAFT' ? 'Bản nháp' : 'Hủy bỏ'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-muted-foreground capitalize">{q.creator.username}</td>
-                    <td className="p-3 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Link
-                          href={`/quotations/${q.id}`}
-                          className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
-                          title="Xem chi tiết & In"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {['DRAFT', 'SENT'].includes(q.status) && (
-                          <Link
-                            href={`/quotations/${q.id}#edit`}
-                            className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
-                            title="Chỉnh sửa báo giá"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        )}
-                        {q.status !== 'CONVERTED' && (
-                          <button
-                            onClick={() => handleConvert(q.id)}
-                            className="rounded p-1 hover:bg-emerald-500/10 text-emerald-500 hover:text-emerald-600 cursor-pointer"
-                            title="Chuyển thành Hóa đơn"
-                          >
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        )}
-                        {q.status === 'DRAFT' && (
-                          <button
-                            onClick={() => handleDelete(q.id)}
-                            className="rounded p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer"
-                            title="Xóa"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                groupedQuotations.map((group) => (
+                  <React.Fragment key={group.customerId}>
+                    <tr className="bg-muted/30">
+                      <td colSpan={7} className="px-3 py-2">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="font-bold text-foreground">
+                            {group.customer.name}
+                            {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
+                            {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                            {group.quotations.length} báo giá - Tổng {formatCurrency(group.total)}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.quotations.map((q) => (
+                      <tr key={q.id} className="hover:bg-muted/10 transition-colors">
+                        <td className="p-3 pl-8 font-bold text-foreground">
+                          <Link href={`/quotations/${q.id}`} className="hover:underline">{q.code}</Link>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{formatDate(q.date)}</td>
+                        <td className="p-3 text-muted-foreground">{q.dueDate ? formatDate(q.dueDate) : '—'}</td>
+                        <td className="p-3 font-extrabold text-foreground">{formatCurrency(q.total)}</td>
+                        <td className="p-3">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                            q.status === 'CONVERTED' ? 'bg-emerald-500/10 text-emerald-500' :
+                            q.status === 'SENT' ? 'bg-blue-500/10 text-blue-500' :
+                            q.status === 'ACCEPTED' ? 'bg-indigo-500/10 text-indigo-500' :
+                            q.status === 'DRAFT' ? 'bg-amber-500/10 text-amber-500' :
+                            'bg-destructive/10 text-destructive'
+                          }`}>
+                            {q.status === 'CONVERTED' ? 'Đã chuyển HĐ' :
+                             q.status === 'SENT' ? 'Đã gửi' :
+                             q.status === 'ACCEPTED' ? 'Đã duyệt' :
+                             q.status === 'DRAFT' ? 'Bản nháp' : 'Hủy bỏ'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground capitalize">{q.creator.username}</td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Link
+                              href={`/quotations/${q.id}`}
+                              className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                              title="Xem chi tiết & In"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            {['DRAFT', 'SENT'].includes(q.status) && (
+                              <Link
+                                href={`/quotations/${q.id}#edit`}
+                                className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                                title="Chỉnh sửa báo giá"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Link>
+                            )}
+                            {q.status !== 'CONVERTED' && (
+                              <button
+                                onClick={() => handleConvert(q.id)}
+                                className="rounded p-1 hover:bg-emerald-500/10 text-emerald-500 hover:text-emerald-600 cursor-pointer"
+                                title="Chuyển thành Hóa đơn"
+                              >
+                                <ArrowRight className="h-4 w-4" />
+                              </button>
+                            )}
+                            {q.status === 'DRAFT' && (
+                              <button
+                                onClick={() => handleDelete(q.id)}
+                                className="rounded p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer"
+                                title="Xóa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
