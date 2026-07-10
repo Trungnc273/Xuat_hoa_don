@@ -75,6 +75,8 @@ model Customer {
   contactPerson String?
   tagName       String?
   tagColor      String?
+  priceTierId   String?
+  priceTier     CustomerPriceTier? @relation(fields: [priceTierId], references: [id], onDelete: SetNull)
   note          String?
   quotations    Quotation[]
   invoices      Invoice[]
@@ -83,6 +85,20 @@ model Customer {
   updatedAt     DateTime    @updatedAt
 
   @@map("customers")
+}
+
+model CustomerPriceTier {
+  organizationId String? // để cửa multi-tenant (ADR-002), chưa dùng
+  id             String             @id @default(uuid())
+  name           String             @unique
+  color          String             @default("#2563eb")
+  description    String?
+  customers      Customer[]
+  productPrices  ProductTierPrice[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@map("customer_price_tiers")
 }
 
 model Supplier {
@@ -134,11 +150,26 @@ model Product {
   images         String[]
   description    String?
   stock          Int             @default(0)
+  tierPrices     ProductTierPrice[]
   stockMovements StockMovement[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   @@map("products")
+}
+
+model ProductTierPrice {
+  id        String            @id @default(uuid())
+  productId String
+  product   Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tierId    String
+  tier      CustomerPriceTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  price     Float
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([productId, tierId])
+  @@map("product_tier_prices")
 }
 
 model Warehouse {

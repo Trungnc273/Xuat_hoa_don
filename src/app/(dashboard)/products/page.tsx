@@ -21,15 +21,27 @@ interface Product {
   category: { name: string } | null;
   importPrice: number;
   salePrice: number;
-  priceC1: number | null;
-  priceC2: number | null;
-  priceC3: number | null;
+  tierPrices: ProductTierPrice[];
   vatRate: number;
   unit: string;
   images: string[];
   description: string | null;
   stock: number;
   createdAt: string;
+}
+
+interface CustomerPriceTier {
+  id: string;
+  name: string;
+  color: string;
+  description?: string | null;
+}
+
+interface ProductTierPrice {
+  id: string;
+  tierId: string;
+  price: number;
+  tier: CustomerPriceTier;
 }
 
 interface Category {
@@ -43,6 +55,7 @@ type ProductImportRow = Record<string, string | number | boolean | null | undefi
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [priceTiers, setPriceTiers] = useState<CustomerPriceTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryIdFilter, setCategoryIdFilter] = useState('');
@@ -63,9 +76,7 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [importPrice, setImportPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
-  const [priceC1, setPriceC1] = useState('');
-  const [priceC2, setPriceC2] = useState('');
-  const [priceC3, setPriceC3] = useState('');
+  const [tierPriceValues, setTierPriceValues] = useState<Record<string, string>>({});
   const [vatRate, setVatRate] = useState('10');
   const [unit, setUnit] = useState('Cái');
   const [images, setImages] = useState<string[]>([]);
@@ -82,6 +93,10 @@ export default function ProductsPage() {
     const trimmed = value.trim();
     return trimmed === '' ? null : parseFloat(trimmed);
   };
+
+  const buildTierPricePayload = () => Object.fromEntries(
+    priceTiers.map((tier) => [tier.id, parseOptionalPrice(tierPriceValues[tier.id] || '')])
+  );
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -104,6 +119,18 @@ export default function ProductsPage() {
       if (res.ok) {
         const data = await res.json();
         setCategories(data.categories);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchPriceTiers = async () => {
+    try {
+      const res = await fetch('/api/customer-price-tiers');
+      if (res.ok) {
+        const data = await res.json();
+        setPriceTiers(data.tiers);
       }
     } catch (err) {
       console.error(err);
@@ -198,6 +225,7 @@ export default function ProductsPage() {
     queueMicrotask(() => {
       void fetchProducts();
       void fetchCategories();
+      void fetchPriceTiers();
     });
   }, [fetchProducts]);
 
@@ -256,9 +284,9 @@ export default function ProductsPage() {
     setCategoryId(product.categoryId ?? '');
     setImportPrice(product.importPrice.toString());
     setSalePrice(product.salePrice.toString());
-    setPriceC1(product.priceC1?.toString() || '');
-    setPriceC2(product.priceC2?.toString() || '');
-    setPriceC3(product.priceC3?.toString() || '');
+    setTierPriceValues(Object.fromEntries(
+      product.tierPrices.map((tierPrice) => [tierPrice.tierId, tierPrice.price.toString()])
+    ));
     setVatRate(product.vatRate.toString());
     setUnit(product.unit);
     setImages(product.images);
@@ -288,9 +316,7 @@ export default function ProductsPage() {
           name, sku, barcode, categoryId,
           importPrice: parseFloat(importPrice),
           salePrice: parseFloat(salePrice),
-          priceC1: parseOptionalPrice(priceC1),
-          priceC2: parseOptionalPrice(priceC2),
-          priceC3: parseOptionalPrice(priceC3),
+          tierPrices: buildTierPricePayload(),
           vatRate: parseFloat(vatRate),
           unit, images, description,
           stock: parseInt(stock)
@@ -329,9 +355,7 @@ export default function ProductsPage() {
           name, sku, barcode, categoryId,
           importPrice: parseFloat(importPrice),
           salePrice: parseFloat(salePrice),
-          priceC1: parseOptionalPrice(priceC1),
-          priceC2: parseOptionalPrice(priceC2),
-          priceC3: parseOptionalPrice(priceC3),
+          tierPrices: buildTierPricePayload(),
           vatRate: parseFloat(vatRate),
           unit, images, description,
         }),
@@ -392,9 +416,9 @@ export default function ProductsPage() {
           categoryName: row['Danh Mục'] || row['Nhóm'],
           importPrice: row['Giá Nhập'],
           salePrice: row['Giá Khách Lẻ'] || row['Giá Bán'],
-          priceC1: row['Giá C1'],
-          priceC2: row['Giá C2'],
-          priceC3: row['Giá C3'],
+          tierPrices: Object.fromEntries(
+            priceTiers.map((tier) => [tier.id, row[`Giá ${tier.name}`]])
+          ),
           vatRate: row['Thuế VAT (%)'] || 10,
           unit: row['Đơn Vị Tính'] || 'Cái',
           stock: row['Tồn Kho'] || 0,
@@ -447,9 +471,7 @@ export default function ProductsPage() {
     setCategoryId('');
     setImportPrice('');
     setSalePrice('');
-    setPriceC1('');
-    setPriceC2('');
-    setPriceC3('');
+    setTierPriceValues({});
     setVatRate('10');
     setUnit('Chiếc');
     setImages([]);
@@ -551,7 +573,7 @@ export default function ProductsPage() {
                 <th className="p-3">Danh mục</th>
                 <th className="p-3">Giá nhập</th>
                 <th className="p-3">Giá bán</th>
-                <th className="p-3">Giá C1/C2/C3</th>
+                <th className="p-3">Giá theo phân loại</th>
                 <th className="p-3">Đơn vị</th>
                 <th className="p-3 text-center">Tồn kho</th>
                 <th className="p-3 text-right">Chức năng</th>
@@ -587,9 +609,15 @@ export default function ProductsPage() {
                     <td className="p-3 font-semibold text-muted-foreground">{formatCurrency(p.importPrice)}</td>
                     <td className="p-3 font-extrabold text-foreground">{formatCurrency(p.salePrice)}</td>
                     <td className="p-3 text-[10px] text-muted-foreground">
-                      <div>C1: <span className="font-semibold text-foreground">{p.priceC1 === null ? '-' : formatCurrency(p.priceC1)}</span></div>
-                      <div>C2: <span className="font-semibold text-foreground">{p.priceC2 === null ? '-' : formatCurrency(p.priceC2)}</span></div>
-                      <div>C3: <span className="font-semibold text-foreground">{p.priceC3 === null ? '-' : formatCurrency(p.priceC3)}</span></div>
+                      {p.tierPrices.length === 0 ? (
+                        <span>-</span>
+                      ) : (
+                        p.tierPrices.map((tierPrice) => (
+                          <div key={tierPrice.id}>
+                            {tierPrice.tier.name}: <span className="font-semibold text-foreground">{formatCurrency(tierPrice.price)}</span>
+                          </div>
+                        ))
+                      )}
                     </td>
                     <td className="p-3 text-muted-foreground">{p.unit}</td>
                     <td className="p-3 text-center">
@@ -711,20 +739,21 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-semibold mb-1">Giá C1 (VND)</label>
-                  <input type="number" value={priceC1} onChange={(e) => setPriceC1(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+              {priceTiers.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {priceTiers.map((tier) => (
+                    <div key={tier.id}>
+                      <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
+                      <input
+                        type="number"
+                        value={tierPriceValues[tier.id] || ''}
+                        onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
+                        className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
+                      />
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="block font-semibold mb-1">Giá C2 (VND)</label>
-                  <input type="number" value={priceC2} onChange={(e) => setPriceC2(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Giá C3 (VND)</label>
-                  <input type="number" value={priceC3} onChange={(e) => setPriceC3(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -840,20 +869,21 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-semibold mb-1">Giá C1 (VND)</label>
-                  <input type="number" value={priceC1} onChange={(e) => setPriceC1(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+              {priceTiers.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {priceTiers.map((tier) => (
+                    <div key={tier.id}>
+                      <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
+                      <input
+                        type="number"
+                        value={tierPriceValues[tier.id] || ''}
+                        onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
+                        className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
+                      />
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="block font-semibold mb-1">Giá C2 (VND)</label>
-                  <input type="number" value={priceC2} onChange={(e) => setPriceC2(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Giá C3 (VND)</label>
-                  <input type="number" value={priceC3} onChange={(e) => setPriceC3(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
-                </div>
-              </div>
+              )}
 
               <div>
                 <label className="block font-semibold mb-1">Hình ảnh sản phẩm</label>
@@ -921,7 +951,13 @@ export default function ProductsPage() {
                 <li><code className="text-primary">Danh Mục</code> (Tên danh mục, e.g. Thiết bị điện tử)</li>
                 <li><code className="text-primary">Giá Nhập</code> (Số nguyên)</li>
                 <li><code className="text-primary">Giá Khách Lẻ</code> hoặc <code className="text-primary">Giá Bán</code> (Số nguyên)</li>
-                <li><code className="text-primary">Giá C1</code>, <code className="text-primary">Giá C2</code>, <code className="text-primary">Giá C3</code> (Tùy chọn)</li>
+                {priceTiers.length > 0 && (
+                  <li>
+                    Các cột giá theo phân loại hiện có: {priceTiers.map((tier) => (
+                      <code key={tier.id} className="text-primary"> Giá {tier.name}</code>
+                    ))} (Tùy chọn)
+                  </li>
+                )}
                 <li><code className="text-primary">Mã SKU</code> (Tùy chọn)</li>
                 <li><code className="text-primary">Thuế VAT (%)</code> (Số nguyên, mặc định 10)</li>
                 <li><code className="text-primary">Đơn Vị Tính</code> (Mặc định: Cái)</li>

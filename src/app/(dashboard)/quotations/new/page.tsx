@@ -14,6 +14,20 @@ interface Customer {
   name: string;
   company: string | null;
   tagName: string | null;
+  priceTierId: string | null;
+}
+
+interface CustomerPriceTier {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface ProductTierPrice {
+  id: string;
+  tierId: string;
+  price: number;
+  tier: CustomerPriceTier;
 }
 
 interface Product {
@@ -23,9 +37,7 @@ interface Product {
   name: string;
   description: string | null;
   salePrice: number;
-  priceC1: number | null;
-  priceC2: number | null;
-  priceC3: number | null;
+  tierPrices: ProductTierPrice[];
   vatRate: number;
   unit: string;
 }
@@ -103,15 +115,19 @@ export default function NewQuotationPage() {
   };
 
   const getCustomerTier = (customerId: string) => {
-    const tagName = customers.find((customer) => customer.id === customerId)?.tagName?.trim().toLowerCase();
-    return tagName === 'c1' || tagName === 'c2' || tagName === 'c3' ? tagName : null;
+    const customer = customers.find((item) => item.id === customerId);
+    return {
+      id: customer?.priceTierId || null,
+      name: customer?.tagName?.trim().toLowerCase() || null,
+    };
   };
 
-  const getProductPriceForTier = (product: Product, tier: string | null) => {
-    if (tier === 'c1') return product.priceC1 ?? product.salePrice;
-    if (tier === 'c2') return product.priceC2 ?? product.salePrice;
-    if (tier === 'c3') return product.priceC3 ?? product.salePrice;
-    return product.salePrice;
+  const getProductPriceForTier = (product: Product, tier: { id: string | null; name: string | null }) => {
+    const matchedById = tier.id ? product.tierPrices.find((tierPrice) => tierPrice.tierId === tier.id) : null;
+    const matchedByName = tier.name
+      ? product.tierPrices.find((tierPrice) => tierPrice.tier.name.trim().toLowerCase() === tier.name)
+      : null;
+    return matchedById?.price ?? matchedByName?.price ?? product.salePrice;
   };
 
   const handleCustomerChange = (customerId: string) => {

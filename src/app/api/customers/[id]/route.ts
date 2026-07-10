@@ -27,6 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           orderBy: { date: 'desc' },
           take: 10,
         },
+        priceTier: true,
       },
     });
 
@@ -70,7 +71,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = await req.json();
-    const { name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note } = body;
+    const { name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, priceTierId, note } = body;
 
     const existingCustomer = await prisma.customer.findUnique({
       where: { id },
@@ -79,6 +80,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!existingCustomer) {
       return NextResponse.json({ error: 'Không tìm thấy khách hàng' }, { status: 404 });
     }
+
+    const requestedPriceTierId = priceTierId !== undefined ? priceTierId : existingCustomer.priceTierId;
+    const priceTier = requestedPriceTierId
+      ? await prisma.customerPriceTier.findUnique({ where: { id: requestedPriceTierId } })
+      : null;
 
     const updatedCustomer = await prisma.customer.update({
       where: { id },
@@ -90,8 +96,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         email,
         phone,
         contactPerson,
-        tagName,
-        tagColor,
+        tagName: priceTier?.name ?? (tagName !== undefined ? tagName : existingCustomer.tagName),
+        tagColor: priceTier?.color ?? (tagColor !== undefined ? tagColor : existingCustomer.tagColor),
+        priceTierId: requestedPriceTierId ? (priceTier?.id ?? existingCustomer.priceTierId) : null,
         note,
       },
     });

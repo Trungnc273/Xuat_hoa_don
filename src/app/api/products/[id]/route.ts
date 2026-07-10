@@ -17,6 +17,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       where: { id },
       include: {
         category: true,
+        tierPrices: {
+          include: {
+            tier: true,
+          },
+          orderBy: {
+            tier: { name: 'asc' },
+          },
+        },
         stockMovements: {
           orderBy: { createdAt: 'desc' },
           take: 15,
@@ -54,7 +62,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = await req.json();
-    const { sku, barcode, name, categoryId, importPrice, salePrice, priceC1, priceC2, priceC3, vatRate, unit, images, description } = body;
+    const { sku, barcode, name, categoryId, importPrice, salePrice, tierPrices, vatRate, unit, images, description } = body;
 
     const existingProduct = await prisma.product.findUnique({
       where: { id },
@@ -64,23 +72,39 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
     }
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: {
-        sku: sku !== undefined ? sku : existingProduct.sku,
-        barcode: barcode !== undefined ? barcode : existingProduct.barcode,
-        name: name !== undefined ? name : existingProduct.name,
-        categoryId: categoryId !== undefined ? (categoryId || null) : existingProduct.categoryId,
-        importPrice: importPrice !== undefined ? parseFloat(importPrice) : existingProduct.importPrice,
-        salePrice: salePrice !== undefined ? parseFloat(salePrice) : existingProduct.salePrice,
-        priceC1: priceC1 !== undefined ? (priceC1 === null || priceC1 === '' ? null : parseFloat(priceC1)) : existingProduct.priceC1,
-        priceC2: priceC2 !== undefined ? (priceC2 === null || priceC2 === '' ? null : parseFloat(priceC2)) : existingProduct.priceC2,
-        priceC3: priceC3 !== undefined ? (priceC3 === null || priceC3 === '' ? null : parseFloat(priceC3)) : existingProduct.priceC3,
-        vatRate: vatRate !== undefined ? parseFloat(vatRate) : existingProduct.vatRate,
-        unit: unit !== undefined ? unit : existingProduct.unit,
-        images: images !== undefined ? images : existingProduct.images,
-        description: description !== undefined ? description : existingProduct.description,
-      },
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id },
+        data: {
+          sku: sku !== undefined ? sku : existingProduct.sku,
+          barcode: barcode !== undefined ? barcode : existingProduct.barcode,
+          name: name !== undefined ? name : existingProduct.name,
+          categoryId: categoryId !== undefined ? (categoryId || null) : existingProduct.categoryId,
+          importPrice: importPrice !== undefined ? parseFloat(importPrice) : existingProduct.importPrice,
+          salePrice: salePrice !== undefined ? parseFloat(salePrice) : existingProduct.salePrice,
+          vatRate: vatRate !== undefined ? parseFloat(vatRate) : existingProduct.vatRate,
+          unit: unit !== undefined ? unit : existingProduct.unit,
+          images: images !== undefined ? images : existingProduct.images,
+          description: description !== undefined ? description : existingProduct.description,
+        },
+      });
+
+      if (tierPrices && typeof tierPrices === 'object') {
+        await tx.productTierPrice.deleteMany({ where: { productId: id } });
+        const rows = Object.entries(tierPrices)
+          .filter(([, price]) => price !== null && price !== '')
+          .map(([tierId, price]) => ({
+            productId: id,
+            tierId,
+            price: Number(price),
+          }));
+
+        if (rows.length > 0) {
+          await tx.productTierPrice.createMany({ data: rows });
+        }
+      }
+
+      return product;
     });
 
     // Ghi nhật ký

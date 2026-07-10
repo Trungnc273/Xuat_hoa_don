@@ -35,11 +35,10 @@ export async function POST(req: Request) {
 
     let successCount = 0;
     let skipCount = 0;
-
     // Chạy từng sản phẩm trong transaction
     await prisma.$transaction(async (tx) => {
       for (const row of products) {
-        const { sku, barcode, name, categoryName, importPrice, salePrice, priceC1, priceC2, priceC3, vatRate, unit, description, stock } = row;
+        const { sku, barcode, name, categoryName, importPrice, salePrice, tierPrices, vatRate, unit, description, stock } = row;
 
         if (!name || !categoryName || importPrice === undefined || salePrice === undefined) {
           skipCount++;
@@ -86,13 +85,18 @@ export async function POST(req: Request) {
             categoryId: category.id,
             importPrice: parseFloat(importPrice),
             salePrice: parseFloat(salePrice),
-            priceC1: priceC1 === undefined || priceC1 === null || priceC1 === '' ? null : parseFloat(priceC1),
-            priceC2: priceC2 === undefined || priceC2 === null || priceC2 === '' ? null : parseFloat(priceC2),
-            priceC3: priceC3 === undefined || priceC3 === null || priceC3 === '' ? null : parseFloat(priceC3),
             vatRate: parseFloat(vatRate || 10),
             unit: unit || 'Cái',
             description: description || null,
             stock: qty,
+            tierPrices: {
+              create: Object.entries(tierPrices || {})
+                .filter(([, price]) => price !== undefined && price !== null && price !== '')
+                .map(([tierId, price]) => ({
+                  tierId,
+                  price: parseFloat(String(price)),
+                })),
+            },
           },
         });
 

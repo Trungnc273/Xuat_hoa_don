@@ -12,7 +12,14 @@ export const partnerSchema = z.object({
   contactPerson: optionalStr,
   tagName: optionalStr,
   tagColor: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Màu tag không hợp lệ').nullish().or(z.literal('').transform(() => undefined)),
+  priceTierId: z.string().uuid('Phân loại khách hàng không hợp lệ').nullish().or(z.literal('').transform(() => undefined)),
   note: optionalStr,
+});
+
+export const customerPriceTierSchema = z.object({
+  name: z.string().trim().min(1, 'Tên phân loại là bắt buộc'),
+  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Màu phân loại không hợp lệ').default('#2563eb'),
+  description: optionalStr,
 });
 
 /** POST /api/products */
@@ -23,9 +30,14 @@ export const createProductSchema = z.object({
   categoryId: z.string().uuid('categoryId không hợp lệ').nullish(),
   importPrice: z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá nhập không được âm'),
   salePrice: z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá bán không được âm'),
-  priceC1: z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá C1 không được âm').nullish(),
-  priceC2: z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá C2 không được âm').nullish(),
-  priceC3: z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá C3 không được âm').nullish(),
+  tierPrices: z.record(
+    z.string().uuid('Phân loại khách hàng không hợp lệ'),
+    z.union([
+      z.coerce.number({ message: 'Phải là số' }).min(0, 'Giá phân loại không được âm'),
+      z.null(),
+      z.literal(''),
+    ])
+  ).default({}),
   vatRate: percent.default(10),
   unit: z.string().trim().default('Cái'),
   images: z.array(z.string()).default([]),

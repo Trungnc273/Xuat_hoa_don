@@ -21,11 +21,20 @@ interface Customer {
   contactPerson: string | null;
   tagName: string | null;
   tagColor: string | null;
+  priceTierId: string | null;
+  priceTier: CustomerPriceTier | null;
   note: string | null;
   createdAt: string;
 }
 
 const TAG_COLORS = ['#2563eb', '#16a34a', '#f97316', '#dc2626', '#9333ea', '#0891b2', '#64748b'];
+
+interface CustomerPriceTier {
+  id: string;
+  name: string;
+  color: string;
+  description: string | null;
+}
 
 interface CustomerInvoice {
   id: string;
@@ -50,6 +59,7 @@ interface CustomerDetail {
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [priceTiers, setPriceTiers] = useState<CustomerPriceTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -71,9 +81,14 @@ export default function CustomersPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [contactPerson, setContactPerson] = useState('');
-  const [tagName, setTagName] = useState('');
-  const [tagColor, setTagColor] = useState(TAG_COLORS[0]);
+  const [priceTierId, setPriceTierId] = useState('');
   const [note, setNote] = useState('');
+  const [isTierOpen, setIsTierOpen] = useState(false);
+  const [tierName, setTierName] = useState('');
+  const [tierColor, setTierColor] = useState(TAG_COLORS[0]);
+  const [tierDesc, setTierDesc] = useState('');
+  const [editingTierId, setEditingTierId] = useState<string | null>(null);
+  const [tierError, setTierError] = useState('');
 
   const { user } = useApp();
 
@@ -92,8 +107,23 @@ export default function CustomersPage() {
     }
   }, [page, search]);
 
+  const fetchPriceTiers = async () => {
+    try {
+      const res = await fetch('/api/customer-price-tiers');
+      if (res.ok) {
+        const data = await res.json();
+        setPriceTiers(data.tiers);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
-    queueMicrotask(() => void fetchCustomers());
+    queueMicrotask(() => {
+      void fetchCustomers();
+      void fetchPriceTiers();
+    });
   }, [fetchCustomers]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -131,8 +161,7 @@ export default function CustomersPage() {
     setEmail(customer.email || '');
     setPhone(customer.phone || '');
     setContactPerson(customer.contactPerson || '');
-    setTagName(customer.tagName || '');
-    setTagColor(customer.tagColor || TAG_COLORS[0]);
+    setPriceTierId(customer.priceTierId || '');
     setNote(customer.note || '');
     setIsEditOpen(true);
   };
@@ -145,7 +174,7 @@ export default function CustomersPage() {
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note }),
+        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, priceTierId, note }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -169,7 +198,7 @@ export default function CustomersPage() {
       const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, tagName, tagColor, note }),
+        body: JSON.stringify({ name, company, taxCode, address, email, phone, contactPerson, priceTierId, note }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -215,45 +244,94 @@ export default function CustomersPage() {
     setEmail('');
     setPhone('');
     setContactPerson('');
-    setTagName('');
-    setTagColor(TAG_COLORS[0]);
+    setPriceTierId('');
     setNote('');
     setError('');
+  };
+
+  const handleTierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTierError('');
+
+    if (!tierName.trim()) {
+      setTierError('Tên phân loại là bắt buộc');
+      return;
+    }
+
+    try {
+      const url = editingTierId ? `/api/customer-price-tiers/${editingTierId}` : '/api/customer-price-tiers';
+      const method = editingTierId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: tierName, color: tierColor, description: tierDesc }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setTierName('');
+        setTierColor(TAG_COLORS[0]);
+        setTierDesc('');
+        setEditingTierId(null);
+        await fetchPriceTiers();
+        if (!editingTierId && data.tier?.id) {
+          setPriceTierId(data.tier.id);
+        }
+      } else {
+        setTierError(data.error || 'Có lỗi xảy ra');
+      }
+    } catch {
+      setTierError('Lỗi kết nối máy chủ');
+    }
+  };
+
+  const handleTierDelete = async (tierId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa phân loại khách hàng này?')) return;
+    setTierError('');
+
+    try {
+      const res = await fetch(`/api/customer-price-tiers/${tierId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        if (priceTierId === tierId) setPriceTierId('');
+        if (editingTierId === tierId) {
+          setEditingTierId(null);
+          setTierName('');
+          setTierColor(TAG_COLORS[0]);
+          setTierDesc('');
+        }
+        await fetchPriceTiers();
+      } else {
+        setTierError(data.error || 'Có lỗi xảy ra khi xóa');
+      }
+    } catch {
+      setTierError('Lỗi kết nối máy chủ');
+    }
   };
 
   const renderTagFields = () => (
     <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
       <div>
-        <label className="block font-semibold mb-1">Tag khách hàng</label>
-        <input
-          type="text"
-          value={tagName}
-          onChange={(e) => setTagName(e.target.value)}
-          className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground"
-          placeholder="VIP, C1, C2, đại lý..."
-        />
+        <label className="block font-semibold mb-1">Phân loại khách hàng</label>
+        <select
+          value={priceTierId}
+          onChange={(e) => setPriceTierId(e.target.value)}
+          className="w-full rounded border border-border bg-card p-2 focus:outline-none focus:border-foreground"
+        >
+          <option value="">Khách lẻ / không phân loại</option>
+          {priceTiers.map((tier) => (
+            <option key={tier.id} value={tier.id}>{tier.name}</option>
+          ))}
+        </select>
       </div>
       <div>
-        <label className="block font-semibold mb-1">Màu</label>
-        <input
-          type="color"
-          value={tagColor}
-          onChange={(e) => setTagColor(e.target.value)}
-          className="h-9 w-11 rounded border border-border bg-card p-1 cursor-pointer"
-          title="Chọn màu tag"
-        />
-      </div>
-      <div className="col-span-2 flex flex-wrap gap-1.5">
-        {TAG_COLORS.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => setTagColor(color)}
-            className={`h-5 w-5 rounded-full border cursor-pointer ${tagColor === color ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card' : 'border-border'}`}
-            style={{ backgroundColor: color }}
-            title={color}
-          />
-        ))}
+        <button
+          type="button"
+          onClick={() => { setTierError(''); setIsTierOpen(true); }}
+          className="rounded border border-border px-3 py-2 font-bold hover:bg-secondary cursor-pointer"
+        >
+          Quản lý
+        </button>
       </div>
     </div>
   );
@@ -310,7 +388,7 @@ export default function CustomersPage() {
                   <th className="p-3">Mã số</th>
                   <th className="p-3">Tên khách hàng</th>
                   <th className="p-3">Công ty</th>
-                  <th className="p-3">Tag</th>
+                  <th className="p-3">Phân loại</th>
                   <th className="p-3">Điện thoại</th>
                   <th className="p-3 text-right">Chức năng</th>
                 </tr>
@@ -335,13 +413,13 @@ export default function CustomersPage() {
                       <td className="p-3 font-semibold text-foreground">{c.name}</td>
                       <td className="p-3 text-muted-foreground max-w-[150px] truncate">{c.company || '—'}</td>
                       <td className="p-3">
-                        {c.tagName ? (
+                        {c.priceTier || c.tagName ? (
                           <span
                             className="inline-flex max-w-[120px] items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                            style={{ backgroundColor: c.tagColor || TAG_COLORS[0] }}
-                            title={c.tagName}
+                            style={{ backgroundColor: c.priceTier?.color || c.tagColor || TAG_COLORS[0] }}
+                            title={c.priceTier?.name || c.tagName || ''}
                           >
-                            <span className="truncate">{c.tagName}</span>
+                            <span className="truncate">{c.priceTier?.name || c.tagName}</span>
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -426,13 +504,13 @@ export default function CustomersPage() {
                 <h4 className="text-sm font-bold text-foreground capitalize">{selectedCustomer.name}</h4>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2">
                   <p className="text-xs text-muted-foreground">{selectedCustomer.code}</p>
-                  {selectedCustomer.tagName && (
+                  {(selectedCustomer.priceTier || selectedCustomer.tagName) && (
                     <span
                       className="inline-flex max-w-[140px] items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                      style={{ backgroundColor: selectedCustomer.tagColor || TAG_COLORS[0] }}
-                      title={selectedCustomer.tagName}
+                      style={{ backgroundColor: selectedCustomer.priceTier?.color || selectedCustomer.tagColor || TAG_COLORS[0] }}
+                      title={selectedCustomer.priceTier?.name || selectedCustomer.tagName || ''}
                     >
-                      <span className="truncate">{selectedCustomer.tagName}</span>
+                      <span className="truncate">{selectedCustomer.priceTier?.name || selectedCustomer.tagName}</span>
                     </span>
                   )}
                 </div>
@@ -646,6 +724,134 @@ export default function CustomersPage() {
                 <button type="submit" className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 cursor-pointer">Cập nhật</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isTierOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl relative max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => { setIsTierOpen(false); setEditingTierId(null); setTierName(''); setTierColor(TAG_COLORS[0]); setTierDesc(''); }}
+              className="absolute top-4 right-4 rounded-md p-1 hover:bg-secondary text-muted-foreground cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-4">Quản lý phân loại khách hàng</h3>
+
+            {tierError && (
+              <div className="mb-3 text-xs font-semibold text-destructive rounded bg-destructive/10 p-2.5 border border-destructive/20">
+                {tierError}
+              </div>
+            )}
+
+            <div className="grid gap-6 md:grid-cols-2 overflow-y-auto pr-1">
+              <form onSubmit={handleTierSubmit} className="space-y-3.5 text-xs border-r border-border/60 pr-5">
+                <h4 className="font-bold text-foreground text-sm uppercase tracking-wider">
+                  {editingTierId ? 'Cập nhật phân loại' : 'Thêm phân loại mới'}
+                </h4>
+
+                <div>
+                  <label className="block font-semibold mb-1">Tên phân loại *</label>
+                  <input
+                    type="text"
+                    required
+                    value={tierName}
+                    onChange={(e) => setTierName(e.target.value)}
+                    className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
+                    placeholder="Ví dụ: Khách sỉ, Đại lý miền Bắc, VIP..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                  <div>
+                    <label className="block font-semibold mb-1">Màu</label>
+                    <input
+                      type="color"
+                      value={tierColor}
+                      onChange={(e) => setTierColor(e.target.value)}
+                      className="h-9 w-12 rounded border border-border bg-card p-1 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TAG_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setTierColor(color)}
+                        className={`h-5 w-5 rounded-full border cursor-pointer ${tierColor === color ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card' : 'border-border'}`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Mô tả</label>
+                  <textarea
+                    value={tierDesc}
+                    onChange={(e) => setTierDesc(e.target.value)}
+                    rows={3}
+                    className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button type="submit" className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 font-bold cursor-pointer">
+                    {editingTierId ? 'Lưu cập nhật' : 'Tạo mới'}
+                  </button>
+                  {editingTierId && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditingTierId(null); setTierName(''); setTierColor(TAG_COLORS[0]); setTierDesc(''); }}
+                      className="rounded px-4 py-2 border border-border text-foreground hover:bg-secondary cursor-pointer"
+                    >
+                      Hủy sửa
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto text-xs">
+                <h4 className="font-bold text-foreground text-sm uppercase tracking-wider mb-2.5">Danh sách hiện tại</h4>
+                {priceTiers.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-6">Chưa có phân loại nào.</p>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {priceTiers.map((tier) => (
+                      <div key={tier.id} className="py-2.5 flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <span
+                            className="inline-flex max-w-[180px] rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                            style={{ backgroundColor: tier.color }}
+                          >
+                            <span className="truncate">{tier.name}</span>
+                          </span>
+                          {tier.description && <p className="text-muted-foreground text-[10px] italic">{tier.description}</p>}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingTierId(tier.id); setTierName(tier.name); setTierColor(tier.color); setTierDesc(tier.description || ''); }}
+                            className="rounded px-2 py-1 bg-secondary hover:bg-muted text-[10px] font-bold border border-border cursor-pointer text-foreground"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTierDelete(tier.id)}
+                            className="rounded px-2 py-1 bg-destructive/10 hover:bg-destructive/20 text-destructive text-[10px] font-bold border border-destructive/20 cursor-pointer"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
