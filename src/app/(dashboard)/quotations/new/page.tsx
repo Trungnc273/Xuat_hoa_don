@@ -13,6 +13,7 @@ interface Customer {
   id: string;
   name: string;
   company: string | null;
+  tagName: string | null;
 }
 
 interface Product {
@@ -22,6 +23,9 @@ interface Product {
   name: string;
   description: string | null;
   salePrice: number;
+  priceC1: number | null;
+  priceC2: number | null;
+  priceC3: number | null;
   vatRate: number;
   unit: string;
 }
@@ -98,11 +102,41 @@ export default function NewQuotationPage() {
     setItems(items.filter((_, idx) => idx !== index));
   };
 
+  const getCustomerTier = (customerId: string) => {
+    const tagName = customers.find((customer) => customer.id === customerId)?.tagName?.trim().toLowerCase();
+    return tagName === 'c1' || tagName === 'c2' || tagName === 'c3' ? tagName : null;
+  };
+
+  const getProductPriceForTier = (product: Product, tier: string | null) => {
+    if (tier === 'c1') return product.priceC1 ?? product.salePrice;
+    if (tier === 'c2') return product.priceC2 ?? product.salePrice;
+    if (tier === 'c3') return product.priceC3 ?? product.salePrice;
+    return product.salePrice;
+  };
+
+  const handleCustomerChange = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    const tier = getCustomerTier(customerId);
+
+    setItems((currentItems) => currentItems.map((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      if (!product) return item;
+
+      const unitPrice = getProductPriceForTier(product, tier);
+      return {
+        ...item,
+        unitPrice,
+        amount: calculateItemAmount(unitPrice, item.quantity, item.vatRate, item.discountRate),
+      };
+    }));
+  };
+
   // Thay đổi sản phẩm trong dòng
   const handleProductChange = (index: number, prodId: string) => {
     const matchedProd = products.find((p) => p.id === prodId);
     if (!matchedProd) return;
 
+    const unitPrice = getProductPriceForTier(matchedProd, getCustomerTier(selectedCustomerId));
     const newItems = [...items];
     newItems[index] = {
       ...newItems[index],
@@ -110,9 +144,9 @@ export default function NewQuotationPage() {
       productName: matchedProd.name,
       productSku: matchedProd.sku || '',
       description: matchedProd.description || newItems[index].description || '',
-      unitPrice: matchedProd.salePrice,
+      unitPrice,
       vatRate: matchedProd.vatRate,
-      amount: calculateItemAmount(matchedProd.salePrice, newItems[index].quantity, matchedProd.vatRate, newItems[index].discountRate),
+      amount: calculateItemAmount(unitPrice, newItems[index].quantity, matchedProd.vatRate, newItems[index].discountRate),
     };
     setItems(newItems);
   };
@@ -276,7 +310,7 @@ export default function NewQuotationPage() {
             <select
               required
               value={selectedCustomerId}
-              onChange={(e) => setSelectedCustomerId(e.target.value)}
+              onChange={(e) => handleCustomerChange(e.target.value)}
               className="w-full rounded-lg border border-border p-2.5 bg-card focus:outline-none focus:border-foreground cursor-pointer"
             >
               <option value="">-- Chọn khách hàng --</option>

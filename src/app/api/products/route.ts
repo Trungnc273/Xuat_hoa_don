@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     const session = auth.session;
 
     const body = createProductSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
-    const { sku, barcode, name, categoryId, importPrice, salePrice, vatRate, unit, images, description, stock } = body;
+    const { sku, barcode, name, categoryId, importPrice, salePrice, priceC1, priceC2, priceC3, vatRate, unit, images, description, stock } = body;
 
     if (!name || importPrice === undefined || salePrice === undefined) {
       return NextResponse.json({ error: 'Vui lòng nhập đầy đủ thông tin bắt buộc: tên, giá nhập, giá bán' }, { status: 400 });
@@ -96,6 +96,9 @@ export async function POST(req: Request) {
           categoryId: categoryId || null,
           importPrice: importPrice,
           salePrice: salePrice,
+          priceC1: priceC1 ?? null,
+          priceC2: priceC2 ?? null,
+          priceC3: priceC3 ?? null,
           vatRate: vatRate,
           unit: unit || 'Cái',
           images: images || [],

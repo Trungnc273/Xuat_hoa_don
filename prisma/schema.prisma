@@ -126,6 +126,9 @@ model Product {
   category       Category?       @relation(fields: [categoryId], references: [id])
   importPrice    Float
   salePrice      Float
+  priceC1        Float?
+  priceC2        Float?
+  priceC3        Float?
   vatRate        Float           @default(10) // E.g. 10
   unit           String          @default("Cái")
   images         String[]

@@ -21,6 +21,9 @@ interface Product {
   category: { name: string } | null;
   importPrice: number;
   salePrice: number;
+  priceC1: number | null;
+  priceC2: number | null;
+  priceC3: number | null;
   vatRate: number;
   unit: string;
   images: string[];
@@ -60,6 +63,9 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [importPrice, setImportPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  const [priceC1, setPriceC1] = useState('');
+  const [priceC2, setPriceC2] = useState('');
+  const [priceC3, setPriceC3] = useState('');
   const [vatRate, setVatRate] = useState('10');
   const [unit, setUnit] = useState('Cái');
   const [images, setImages] = useState<string[]>([]);
@@ -71,6 +77,11 @@ export default function ProductsPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const { user } = useApp();
+
+  const parseOptionalPrice = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed === '' ? null : parseFloat(trimmed);
+  };
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -245,6 +256,9 @@ export default function ProductsPage() {
     setCategoryId(product.categoryId ?? '');
     setImportPrice(product.importPrice.toString());
     setSalePrice(product.salePrice.toString());
+    setPriceC1(product.priceC1?.toString() || '');
+    setPriceC2(product.priceC2?.toString() || '');
+    setPriceC3(product.priceC3?.toString() || '');
     setVatRate(product.vatRate.toString());
     setUnit(product.unit);
     setImages(product.images);
@@ -274,6 +288,9 @@ export default function ProductsPage() {
           name, sku, barcode, categoryId,
           importPrice: parseFloat(importPrice),
           salePrice: parseFloat(salePrice),
+          priceC1: parseOptionalPrice(priceC1),
+          priceC2: parseOptionalPrice(priceC2),
+          priceC3: parseOptionalPrice(priceC3),
           vatRate: parseFloat(vatRate),
           unit, images, description,
           stock: parseInt(stock)
@@ -312,6 +329,9 @@ export default function ProductsPage() {
           name, sku, barcode, categoryId,
           importPrice: parseFloat(importPrice),
           salePrice: parseFloat(salePrice),
+          priceC1: parseOptionalPrice(priceC1),
+          priceC2: parseOptionalPrice(priceC2),
+          priceC3: parseOptionalPrice(priceC3),
           vatRate: parseFloat(vatRate),
           unit, images, description,
         }),
@@ -371,7 +391,10 @@ export default function ProductsPage() {
           name: row['Tên Sản Phẩm'] || row['Tên'],
           categoryName: row['Danh Mục'] || row['Nhóm'],
           importPrice: row['Giá Nhập'],
-          salePrice: row['Giá Bán'],
+          salePrice: row['Giá Khách Lẻ'] || row['Giá Bán'],
+          priceC1: row['Giá C1'],
+          priceC2: row['Giá C2'],
+          priceC3: row['Giá C3'],
           vatRate: row['Thuế VAT (%)'] || 10,
           unit: row['Đơn Vị Tính'] || 'Cái',
           stock: row['Tồn Kho'] || 0,
@@ -424,6 +447,9 @@ export default function ProductsPage() {
     setCategoryId('');
     setImportPrice('');
     setSalePrice('');
+    setPriceC1('');
+    setPriceC2('');
+    setPriceC3('');
     setVatRate('10');
     setUnit('Chiếc');
     setImages([]);
@@ -525,6 +551,7 @@ export default function ProductsPage() {
                 <th className="p-3">Danh mục</th>
                 <th className="p-3">Giá nhập</th>
                 <th className="p-3">Giá bán</th>
+                <th className="p-3">Giá C1/C2/C3</th>
                 <th className="p-3">Đơn vị</th>
                 <th className="p-3 text-center">Tồn kho</th>
                 <th className="p-3 text-right">Chức năng</th>
@@ -533,11 +560,11 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-muted-foreground">Đang tải danh sách...</td>
+                  <td colSpan={10} className="p-8 text-center text-muted-foreground">Đang tải danh sách...</td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-muted-foreground">Không tìm thấy sản phẩm nào.</td>
+                  <td colSpan={10} className="p-8 text-center text-muted-foreground">Không tìm thấy sản phẩm nào.</td>
                 </tr>
               ) : (
                 products.map((p) => (
@@ -559,6 +586,11 @@ export default function ProductsPage() {
                     <td className="p-3 text-muted-foreground">{p.category?.name ?? 'Không phân mục'}</td>
                     <td className="p-3 font-semibold text-muted-foreground">{formatCurrency(p.importPrice)}</td>
                     <td className="p-3 font-extrabold text-foreground">{formatCurrency(p.salePrice)}</td>
+                    <td className="p-3 text-[10px] text-muted-foreground">
+                      <div>C1: <span className="font-semibold text-foreground">{p.priceC1 === null ? '-' : formatCurrency(p.priceC1)}</span></div>
+                      <div>C2: <span className="font-semibold text-foreground">{p.priceC2 === null ? '-' : formatCurrency(p.priceC2)}</span></div>
+                      <div>C3: <span className="font-semibold text-foreground">{p.priceC3 === null ? '-' : formatCurrency(p.priceC3)}</span></div>
+                    </td>
                     <td className="p-3 text-muted-foreground">{p.unit}</td>
                     <td className="p-3 text-center">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -670,12 +702,27 @@ export default function ProductsPage() {
                   <input type="number" required value={importPrice} onChange={(e) => setImportPrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Giá bán (VND) *</label>
+                  <label className="block font-semibold mb-1">Giá khách lẻ (VND) *</label>
                   <input type="number" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Thuế VAT (%)</label>
                   <input type="number" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold mb-1">Giá C1 (VND)</label>
+                  <input type="number" value={priceC1} onChange={(e) => setPriceC1(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Giá C2 (VND)</label>
+                  <input type="number" value={priceC2} onChange={(e) => setPriceC2(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Giá C3 (VND)</label>
+                  <input type="number" value={priceC3} onChange={(e) => setPriceC3(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
               </div>
 
@@ -784,12 +831,27 @@ export default function ProductsPage() {
                   <input type="number" required value={importPrice} onChange={(e) => setImportPrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Giá bán (VND) *</label>
+                  <label className="block font-semibold mb-1">Giá khách lẻ (VND) *</label>
                   <input type="number" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Thuế VAT (%)</label>
                   <input type="number" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold mb-1">Giá C1 (VND)</label>
+                  <input type="number" value={priceC1} onChange={(e) => setPriceC1(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Giá C2 (VND)</label>
+                  <input type="number" value={priceC2} onChange={(e) => setPriceC2(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Giá C3 (VND)</label>
+                  <input type="number" value={priceC3} onChange={(e) => setPriceC3(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
               </div>
 
@@ -858,7 +920,8 @@ export default function ProductsPage() {
                 <li><code className="text-primary">Tên Sản Phẩm</code> (Bắt buộc)</li>
                 <li><code className="text-primary">Danh Mục</code> (Tên danh mục, e.g. Thiết bị điện tử)</li>
                 <li><code className="text-primary">Giá Nhập</code> (Số nguyên)</li>
-                <li><code className="text-primary">Giá Bán</code> (Số nguyên)</li>
+                <li><code className="text-primary">Giá Khách Lẻ</code> hoặc <code className="text-primary">Giá Bán</code> (Số nguyên)</li>
+                <li><code className="text-primary">Giá C1</code>, <code className="text-primary">Giá C2</code>, <code className="text-primary">Giá C3</code> (Tùy chọn)</li>
                 <li><code className="text-primary">Mã SKU</code> (Tùy chọn)</li>
                 <li><code className="text-primary">Thuế VAT (%)</code> (Số nguyên, mặc định 10)</li>
                 <li><code className="text-primary">Đơn Vị Tính</code> (Mặc định: Cái)</li>
