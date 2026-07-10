@@ -15,6 +15,7 @@ export const createQuotationSchema = z.object({
   customerId: z.string().uuid('customerId không hợp lệ'),
   dueDate: optionalDate,
   notes: optionalStr,
+  customFields: z.record(z.string(), z.string()).default({}),
   items: z.array(lineItem).min(1, 'Báo giá phải có ít nhất 1 sản phẩm'),
 });
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;

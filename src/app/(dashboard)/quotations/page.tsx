@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Plus, Search, Edit, Trash2, Eye, 
   ArrowRight,
-  ChevronLeft, ChevronRight
+  ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -31,6 +31,7 @@ export default function QuotationsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [expandedCustomerIds, setExpandedCustomerIds] = useState<Set<string>>(new Set());
   
   const fetchQuotations = useCallback(async () => {
     try {
@@ -111,6 +112,18 @@ export default function QuotationsPage() {
     return Array.from(groups.values());
   }, [quotations]);
 
+  const toggleCustomerGroup = (customerId: string) => {
+    setExpandedCustomerIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(customerId)) {
+        nextIds.delete(customerId);
+      } else {
+        nextIds.add(customerId);
+      }
+      return nextIds;
+    });
+  };
+
   return (
     <div className="space-y-6">
       
@@ -188,23 +201,34 @@ export default function QuotationsPage() {
                   <td colSpan={7} className="p-8 text-center text-muted-foreground">Không tìm thấy báo giá nào.</td>
                 </tr>
               ) : (
-                groupedQuotations.map((group) => (
+                groupedQuotations.map((group) => {
+                  const isExpanded = expandedCustomerIds.has(group.customerId);
+
+                  return (
                   <React.Fragment key={group.customerId}>
-                    <tr className="bg-muted/30">
+                    <tr className="bg-muted/30 hover:bg-muted/50 transition-colors">
                       <td colSpan={7} className="px-3 py-2">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="font-bold text-foreground">
-                            {group.customer.name}
-                            {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
-                            {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
-                          </div>
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomerGroup(group.customerId)}
+                          className="flex w-full flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between"
+                          aria-expanded={isExpanded}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                            <span className="min-w-0 font-bold text-foreground">
+                              {group.customer.name}
+                              {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
+                              {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
+                            </span>
+                          </span>
+                          <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
                             {group.quotations.length} báo giá - Tổng {formatCurrency(group.total)}
-                          </div>
-                        </div>
+                          </span>
+                        </button>
                       </td>
                     </tr>
-                    {group.quotations.map((q) => (
+                    {isExpanded && group.quotations.map((q) => (
                       <tr key={q.id} className="hover:bg-muted/10 transition-colors">
                         <td className="p-3 pl-8 font-bold text-foreground">
                           <Link href={`/quotations/${q.id}`} className="hover:underline">{q.code}</Link>
@@ -268,7 +292,8 @@ export default function QuotationsPage() {
                       </tr>
                     ))}
                   </React.Fragment>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -85,6 +85,12 @@ interface QuotationItemInput {
   amount: number;
 }
 
+interface CustomFieldEntry {
+  id: string;
+  key: string;
+  value: string;
+}
+
 interface QuotationDetail {
   id: string;
   code: string;
@@ -94,6 +100,7 @@ interface QuotationDetail {
   dueDate: string | null;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
   notes: string | null;
+  customFields: Record<string, string> | null;
   subtotal: number;
   vatAmount: number;
   discountAmount: number;
@@ -133,6 +140,34 @@ const calculateItemAmount = (price: number, qty: number, vat: number, disc: numb
   return afterDiscount + afterDiscount * (vat / 100);
 };
 
+const calculateDiscountedUnitPrice = (price: number, disc: number) => {
+  return price - price * (disc / 100);
+};
+
+const makeCustomFieldId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const customFieldsToEntries = (fields: Record<string, string> | null | undefined): CustomFieldEntry[] => {
+  return Object.entries(fields || {}).map(([key, value]) => ({
+    id: makeCustomFieldId(),
+    key,
+    value,
+  }));
+};
+
+const entriesToCustomFields = (entries: CustomFieldEntry[]) => {
+  return entries.reduce<Record<string, string>>((acc, entry) => {
+    const key = entry.key.trim();
+    if (!key) return acc;
+    acc[key] = entry.value.trim();
+    return acc;
+  }, {});
+};
+
 export default function QuotationDocumentWorkspace({ mode, quotationId, startEditing = false }: Props) {
   const router = useRouter();
   const { user } = useApp();
@@ -144,6 +179,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
   const [dueDate, setDueDate] = useState('');
   const [status, setStatus] = useState('DRAFT');
   const [notes, setNotes] = useState('');
+  const [customFields, setCustomFields] = useState<CustomFieldEntry[]>([]);
   const [items, setItems] = useState<QuotationItemInput[]>(mode === 'create' ? [emptyItem()] : []);
   const [isEditing, setIsEditing] = useState(mode === 'create' || startEditing);
   const [loading, setLoading] = useState(true);
@@ -178,6 +214,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
     setDueDate(toDateInputValue(q.dueDate));
     setStatus(q.status);
     setNotes(q.notes || '');
+    setCustomFields(customFieldsToEntries(q.customFields));
     setItems(q.items.map((item) => ({
       id: item.id,
       productId: item.productId || '',
@@ -339,6 +376,20 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
     setItems((currentItems) => currentItems.filter((_, itemIndex) => itemIndex !== index));
   };
 
+  const addCustomField = () => {
+    setCustomFields((currentFields) => [...currentFields, { id: makeCustomFieldId(), key: '', value: '' }]);
+  };
+
+  const updateCustomField = (id: string, field: 'key' | 'value', value: string) => {
+    setCustomFields((currentFields) => currentFields.map((entry) => (
+      entry.id === id ? { ...entry, [field]: value } : entry
+    )));
+  };
+
+  const removeCustomField = (id: string) => {
+    setCustomFields((currentFields) => currentFields.filter((entry) => entry.id !== id));
+  };
+
   const validateForm = () => {
     if (!selectedCustomerId) return 'Vui lòng chọn khách hàng';
     if (items.length === 0) return 'Vui lòng chọn ít nhất 1 sản phẩm';
@@ -366,6 +417,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
           dueDate: dueDate || null,
           status: quotationId ? status : undefined,
           notes,
+          customFields: entriesToCustomFields(customFields),
           items,
         }),
       });
@@ -580,6 +632,57 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
           </div>
         </div>
 
+        {(isEditing || customFields.length > 0) && (
+          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="font-bold uppercase tracking-wider text-gray-500">Thông tin bổ sung</h3>
+              {isEditing && (
+                <button type="button" onClick={addCustomField} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1.5 font-bold text-gray-800 hover:bg-gray-50 print:hidden">
+                  <Plus className="h-3.5 w-3.5" />
+                  Thêm trường
+                </button>
+              )}
+            </div>
+            {isEditing ? (
+              <div className="space-y-2">
+                {customFields.length === 0 && (
+                  <p className="text-gray-500">Chưa có trường bổ sung.</p>
+                )}
+                {customFields.map((field) => (
+                  <div key={field.id} className="grid gap-2 sm:grid-cols-[minmax(0,220px)_1fr_auto]">
+                    <input
+                      type="text"
+                      value={field.key}
+                      onChange={(e) => updateCustomField(field.id, 'key', e.target.value)}
+                      className="rounded border border-gray-300 bg-white px-2 py-1.5 font-semibold"
+                      placeholder="Tên trường, ví dụ: Mục tiêu"
+                    />
+                    <input
+                      type="text"
+                      value={field.value}
+                      onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
+                      className="rounded border border-gray-300 bg-white px-2 py-1.5"
+                      placeholder="Giá trị"
+                    />
+                    <button type="button" onClick={() => removeCustomField(field.id)} className="rounded p-1.5 text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {customFields.map((field) => (
+                  <div key={field.id}>
+                    <span className="font-bold text-gray-700">{field.key}: </span>
+                    <span className="text-gray-600">{field.value || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-8">
           {isEditing && (
             <div className="mb-3 flex justify-end print:hidden">
@@ -590,7 +693,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[880px]">
               <thead>
                 <tr className="border-b border-gray-300 bg-gray-100 text-gray-700 font-bold">
                   <th className="py-2.5 px-2 w-10 text-center">STT</th>
@@ -601,6 +704,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
                   <th className="py-2.5 px-2 w-28 text-right">Đơn giá</th>
                   <th className="py-2.5 px-2 w-16 text-center">VAT</th>
                   <th className="py-2.5 px-2 w-16 text-center">C.Khấu</th>
+                  <th className="py-2.5 px-2 w-28 text-right">Đơn giá sau CK</th>
                   <th className="py-2.5 px-2 w-28 text-right">Thành tiền</th>
                   {isEditing && <th className="py-2.5 px-2 w-10 print:hidden" />}
                 </tr>
@@ -608,6 +712,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
               <tbody className="divide-y divide-gray-200">
                 {items.map((item, index) => {
                   const product = products.find((p) => p.id === item.productId);
+                  const discountedUnitPrice = calculateDiscountedUnitPrice(item.unitPrice, item.discountRate);
                   return (
                     <tr key={item.id || index} className="hover:bg-gray-50/50 align-top">
                       <td className="py-2.5 px-2 text-center text-gray-500">{index + 1}</td>
@@ -644,6 +749,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
                       <td className="py-2.5 px-2 text-center text-gray-500">
                         {isEditing ? <input type="number" min="0" max="100" value={item.discountRate} onChange={(e) => handleItemValueChange(index, 'discountRate', e.target.value)} className="w-14 rounded border border-gray-300 px-1 py-1 text-center" /> : `${item.discountRate}%`}
                       </td>
+                      <td className="py-2.5 px-2 text-right font-semibold text-gray-700">{formatCurrency(discountedUnitPrice)}</td>
                       <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                       {isEditing && (
                         <td className="py-2.5 px-2 print:hidden">

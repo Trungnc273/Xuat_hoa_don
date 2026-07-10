@@ -9,6 +9,7 @@ type UpdateQuotationPayload = {
   dueDate?: string | Date | null;
   status?: string;
   notes?: string | null;
+  customFields?: Record<string, string> | null;
   items?: LineItemInput[];
 };
 
@@ -63,7 +64,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = (await req.json()) as UpdateQuotationPayload;
-    const { customerId, dueDate, status, notes, items } = body;
+    const { customerId, dueDate, status, notes, customFields, items } = body;
 
     const existingQuotation = await prisma.quotation.findUnique({
       where: { id },
@@ -83,6 +84,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
     if (status) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (customFields !== undefined) updateData.customFields = customFields || {};
 
     const updated = await prisma.$transaction(async (tx) => {
       if (items && Array.isArray(items) && items.length > 0) {

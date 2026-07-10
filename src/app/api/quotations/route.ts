@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     }
 
     const body = createQuotationSchema.parse(await req.json()); // Chốt chặn validation (SPEC GĐ2, FR-2)
-    const { customerId, dueDate, notes, items } = body;
+    const { customerId, dueDate, notes, customFields, items } = body;
 
     if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Vui lòng cung cấp khách hàng và danh sách sản phẩm báo giá' }, { status: 400 });
@@ -143,6 +143,7 @@ export async function POST(req: Request) {
           creatorId: session.userId,
           status: 'DRAFT',
           notes,
+          customFields,
           subtotal,
           vatAmount,
           discountAmount,

@@ -216,6 +216,7 @@ model Quotation {
   creator        User            @relation("QuotationCreator", fields: [creatorId], references: [id])
   status         String          @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED, CONVERTED
   notes          String?
+  customFields   Json            @default("{}")
   subtotal       Float
   vatAmount      Float
   discountAmount Float           @default(0)
