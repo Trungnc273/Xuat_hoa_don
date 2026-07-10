@@ -93,6 +93,7 @@ export default function LogsPage() {
       case 'CREATE_PAYMENT': return 'Lập Phiếu chi';
       case 'CREATE_EXPENSE': return 'Ghi Chi phí';
       case 'UPDATE_SETTINGS': return 'Cập nhật Cài đặt';
+      case 'BACKUP_DATA': return 'Sao lưu dữ liệu';
       default: return action;
     }
   };

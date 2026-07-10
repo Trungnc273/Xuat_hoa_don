@@ -7,18 +7,19 @@ import {
   Settings, Building2, Upload, Save, 
   Landmark, User, ShieldAlert,
   Mail, Phone, Globe, CheckCircle2, AlertCircle, X,
-  History, ShieldCheck
+  DatabaseBackup, Download, History, RefreshCw, ShieldCheck
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import LogsPage from '../logs/page';
 import UsersPage from '../users/page';
 
-type SettingsTab = 'business' | 'users' | 'logs';
+type SettingsTab = 'business' | 'users' | 'logs' | 'backup';
 
 const settingsTabs: Array<{ id: SettingsTab; label: string; icon: React.ElementType }> = [
   { id: 'business', label: 'Cấu hình doanh nghiệp', icon: Building2 },
   { id: 'users', label: 'Quản lý tài khoản', icon: ShieldCheck },
   { id: 'logs', label: 'Nhật ký hệ thống', icon: History },
+  { id: 'backup', label: 'Sao lưu dữ liệu', icon: DatabaseBackup },
 ];
 
 function BusinessSettingsPanel() {
@@ -376,6 +377,95 @@ function BusinessSettingsPanel() {
   );
 }
 
+function BackupSettingsPanel() {
+  const [downloading, setDownloading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const downloadBackup = async () => {
+    setDownloading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch('/api/system/backup');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Không tạo được file sao lưu');
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get('content-disposition') || '';
+      const match = contentDisposition.match(/filename="([^"]+)"/);
+      const fileName = match?.[1] || `hoadon-data-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setSuccessMsg(`Đã tạo file sao lưu: ${fileName}`);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Đã xảy ra lỗi khi sao lưu dữ liệu');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight">Sao lưu dữ liệu</h1>
+        <p className="text-sm text-muted-foreground">Tải bản sao lưu dữ liệu hệ thống về máy để cất giữ ở nơi an toàn.</p>
+      </div>
+
+      {successMsg && (
+        <div className="rounded-lg bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-500 border border-emerald-500/20 flex items-center gap-2">
+          <CheckCircle2 className="h-4.5 w-4.5" />
+          {successMsg}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="rounded-lg bg-destructive/10 p-3.5 text-xs font-semibold text-destructive border border-destructive/20 flex items-center gap-2">
+          <AlertCircle className="h-4.5 w-4.5" />
+          {errorMsg}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-primary/10 p-2 text-primary">
+            <DatabaseBackup className="h-5 w-5" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold">Tạo file sao lưu dữ liệu</h2>
+            <p className="text-xs text-muted-foreground">
+              File tải xuống là JSON, chứa dữ liệu các bảng trong hệ thống như khách hàng, sản phẩm, báo giá, hóa đơn, thu chi, công nợ, tài khoản và nhật ký.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+          File backup có chứa hash mật khẩu người dùng. Chỉ lưu ở máy tin cậy, Google Drive/USB riêng của khách, không gửi qua kênh công khai.
+        </div>
+
+        <button
+          type="button"
+          onClick={downloadBackup}
+          disabled={downloading}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 disabled:opacity-50"
+        >
+          {downloading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {downloading ? 'Đang tạo file...' : 'Tải bản sao lưu'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('business');
 
@@ -412,6 +502,7 @@ export default function SettingsPage() {
       {activeTab === 'business' && <BusinessSettingsPanel />}
       {activeTab === 'users' && <UsersPage />}
       {activeTab === 'logs' && <LogsPage />}
+      {activeTab === 'backup' && <BackupSettingsPanel />}
     </div>
   );
 }
