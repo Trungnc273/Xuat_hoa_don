@@ -78,6 +78,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Bạn không có quyền sửa báo giá này' }, { status: 403 });
     }
 
+    // Báo giá đã chuyển thành hóa đơn thì số liệu đã chốt — sửa tiếp sẽ lệch với hóa đơn đã sinh
+    if (existingQuotation.status === 'CONVERTED') {
+      return NextResponse.json(
+        { error: 'Báo giá đã được chuyển thành hóa đơn, không thể sửa. Hãy hủy hóa đơn liên quan trước nếu cần điều chỉnh.' },
+        { status: 400 }
+      );
+    }
+
+    // Whitelist trạng thái — CONVERTED chỉ được đặt bởi luồng chuyển đổi, không đặt tay qua PUT
+    const VALID_STATUSES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'];
+    if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: 'Trạng thái báo giá không hợp lệ' }, { status: 400 });
+    }
+
     // Nếu danh sách sản phẩm thay đổi, chúng ta cần tính lại toàn bộ
     const updateData: Prisma.QuotationUncheckedUpdateInput = {};
     if (customerId) updateData.customerId = customerId;

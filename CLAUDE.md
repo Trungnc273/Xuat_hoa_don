@@ -96,6 +96,13 @@ Docker Desktop tự khởi động.
   quyết ở từng bước, không giả định người đọc suy ra được; luôn kèm câu lệnh kiểm tra kết quả (ví dụ
   `SELECT username FROM users`) ngay sau bước có thể âm thầm thất bại.
 
+- **11/07/2026 — Audit toàn bộ src sau đợt tính năng mới (price tiers, backup, quotation workspace).**
+  Tìm thấy và sửa: (1) DELETE /api/invoices/[id] xóa CỨNG chứng từ và KHÔNG hoàn kho — vi phạm
+  CONSTITUTION Layer 1.2, đã chuyển thành hủy mềm (CANCELLED) + hoàn kho, giữ nguyên endpoint;
+  (2) PUT invoice/quotation nhận status chuỗi tùy ý — đã whitelist enum; (3) sửa được báo giá đã
+  CONVERTED gây lệch số với hóa đơn đã sinh — đã chặn. **Bài học:** mỗi đợt thêm tính năng phải audit
+  lại các route [id] (sửa/xóa) — code sinh nhanh hay quên ràng buộc chứng từ tài chính của Layer 1.2.
+
 ## Việc đang dang dở / điểm tiếp theo
 
 - Giai đoạn 0 (nền tảng vận hành) đã xong: Docker hóa, backup, hướng dẫn cài đặt.

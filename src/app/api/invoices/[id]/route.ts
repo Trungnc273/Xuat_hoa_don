@@ -80,6 +80,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const body = await req.json();
     const { status, notes, templateName } = body;
 
+    // Whitelist trạng thái — không cho ghi chuỗi tùy ý vào chứng từ
+    const VALID_STATUSES = ['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'];
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: 'Trạng thái hóa đơn không hợp lệ' }, { status: 400 });
+    }
+
     const existingInvoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true },
@@ -170,7 +176,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
-// 3. DELETE: Xóa hóa đơn (chỉ cho phép nếu chưa thanh toán xu nào)
+// 3. DELETE: HỦY hóa đơn (soft cancel — CONSTITUTION Layer 1.2 cấm xóa cứng chứng từ tài chính).
+// Trước 11/07/2026 endpoint này xóa cứng bản ghi và KHÔNG hoàn kho → mất chứng từ + lệch tồn vĩnh viễn.
+// Giữ nguyên endpoint DELETE để giao diện cũ không vỡ, nhưng hành vi là hủy + hoàn kho.
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await verifyAuth(req);
@@ -187,9 +195,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        _count: {
-          select: { receipts: true },
-        },
+        items: true,
+        _count: { select: { receipts: true } },
       },
     });
 
@@ -197,30 +204,67 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Không tìm thấy hóa đơn' }, { status: 404 });
     }
 
-    // Nếu đã có phiếu thu, không được xóa
+    if (invoice.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Hóa đơn này đã được hủy từ trước' }, { status: 400 });
+    }
+
+    // Nếu đã có phát sinh thanh toán, phải xử lý phiếu thu trước khi hủy
     if (invoice._count.receipts > 0 || invoice.paidAmount > 0) {
       return NextResponse.json({
-        error: 'Không thể xóa hóa đơn đã có phát sinh thanh toán (Phiếu thu). Vui lòng hủy hóa đơn hoặc xóa phiếu thu trước.',
+        error: 'Không thể hủy hóa đơn đã có phát sinh thanh toán (Phiếu thu). Vui lòng xử lý phiếu thu trước.',
       }, { status: 400 });
     }
 
-    // Lưu lại thông tin trước khi xóa để ghi nhật ký
-    await prisma.invoice.delete({
-      where: { id },
-    });
+    // Hủy mềm + hoàn kho trong cùng transaction
+    await prisma.$transaction(async (tx) => {
+      let defaultWh = await tx.warehouse.findFirst();
+      if (!defaultWh) {
+        defaultWh = await tx.warehouse.create({
+          data: { code: 'KHO000001', name: 'Kho trung tâm' },
+        });
+      }
+
+      for (const item of invoice.items) {
+        if (!item.productId) continue;
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!product) continue;
+
+        const prevStock = product.stock;
+        const newStock = prevStock + item.quantity; // Hoàn trả kho
+
+        await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } });
+        await tx.stockMovement.create({
+          data: {
+            type: 'IN',
+            productId: item.productId,
+            quantity: item.quantity,
+            prevStock,
+            newStock,
+            warehouseId: defaultWh.id,
+            reason: `Hoàn kho do hủy hóa đơn ${invoice.code}`,
+            createdBy: session.username,
+          },
+        });
+      }
+
+      await tx.invoice.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+    }, { maxWait: 10000, timeout: 20000 });
 
     // Ghi nhật ký
     await prisma.activityLog.create({
       data: {
         userId: session.userId,
         username: session.username,
-        action: 'DELETE_INVOICE',
-        details: `Đã xóa hóa đơn: ${invoice.code} (Tổng tiền: ${invoice.total} VND)`,
+        action: 'CANCEL_INVOICE',
+        details: `Đã hủy hóa đơn: ${invoice.code} (Tổng tiền: ${invoice.total} VND). Đã hoàn kho các sản phẩm liên quan. Chứng từ được giữ lại ở trạng thái CANCELLED.`,
         ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
       },
     });
 
-    return NextResponse.json({ message: 'Xóa hóa đơn thành công' });
+    return NextResponse.json({ message: 'Đã hủy hóa đơn và hoàn kho (chứng từ được giữ lại, không xóa vĩnh viễn)' });
   } catch (error) {
     console.error('Lỗi DELETE Invoice:', error);
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
