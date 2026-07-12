@@ -20,6 +20,7 @@ interface InvoiceItem {
   discountRate: number;
   quantity: number;
   amount: number;
+  description?: string | null;
   productImages?: string[];
 }
 
@@ -48,6 +49,7 @@ interface InvoiceDetail {
   date: string;
   status: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
   notes: string | null;
+  customFields?: Record<string, string> | null;
   subtotal: number;
   vatAmount: number;
   discountAmount: number;
@@ -349,6 +351,7 @@ export default function InvoiceDetailPage() {
                           )}
                           <div>
                             <p className="font-bold text-gray-800">{item.productName}</p>
+                            {item.description && <p className="text-[10px] text-gray-500 mt-0.5 whitespace-pre-line">{item.description}</p>}
                           </div>
                         </div>
                       </td>
@@ -480,6 +483,7 @@ export default function InvoiceDetailPage() {
                           <div>
                             <p className="font-bold text-gray-800">{item.productName}</p>
                             {item.productSku && <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.productSku}</p>}
+                            {item.description && <p className="text-[10px] text-gray-500 mt-0.5 whitespace-pre-line">{item.description}</p>}
                           </div>
                         </div>
                       </td>
@@ -589,6 +593,7 @@ export default function InvoiceDetailPage() {
                           <div>
                             <p className="font-bold text-gray-900">{item.productName}</p>
                             {item.productSku && <p className="text-[9px] font-mono text-gray-400 mt-0.5">{item.productSku}</p>}
+                            {item.description && <p className="text-[9px] text-gray-500 mt-0.5 whitespace-pre-line">{item.description}</p>}
                           </div>
                         </div>
                       </td>
@@ -621,6 +626,31 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* THÔNG TIN BỔ SUNG (bê nguyên từ báo giá khi convert) + GHI CHÚ — dùng chung cho cả 3 mẫu */}
+        {((invoice.customFields && Object.keys(invoice.customFields).length > 0) || invoice.notes) && (
+          <div className="px-8 md:px-12 pb-8 space-y-3">
+            {invoice.customFields && Object.keys(invoice.customFields).length > 0 && (
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Thông tin bổ sung</p>
+                <div className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2 text-xs text-gray-700">
+                  {Object.entries(invoice.customFields).map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-3">
+                      <span className="text-gray-500">{k}</span>
+                      <span className="font-semibold text-right">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {invoice.notes && (
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">Ghi chú</p>
+                <p className="text-xs text-gray-700 whitespace-pre-line">{invoice.notes}</p>
+              </div>
+            )}
           </div>
         )}
 

@@ -33,6 +33,7 @@ export async function convertQuotationToInvoice(session: Session, quotationId: s
       productId: item.productId,
       productName: item.productName,
       productSku: item.productSku,
+      description: item.description ?? null, // bê nguyên mô tả dòng hàng từ báo giá
       unitPrice: item.unitPrice,
       vatRate: item.vatRate,
       discountRate: item.discountRate,
@@ -58,6 +59,7 @@ export async function convertQuotationToInvoice(session: Session, quotationId: s
       totals,
       notes: quotation.notes || `Chuyển đổi từ báo giá ${quotation.code}`,
       quotationId: quotation.id,
+      customFields: (quotation.customFields ?? {}) as Record<string, string>, // bê nguyên trường tùy chỉnh từ báo giá
       stockReasonSuffix: ` (chuyển từ báo giá ${quotation.code})`,
     });
     return { ...result, quotation };

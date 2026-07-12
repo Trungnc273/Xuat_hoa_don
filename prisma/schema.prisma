@@ -259,6 +259,7 @@ model Invoice {
   creator         User          @relation("InvoiceCreator", fields: [creatorId], references: [id])
   status          String        @default("UNPAID") // UNPAID, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED
   notes           String?
+  customFields    Json          @default("{}") // bê nguyên từ báo giá khi convert
   subtotal        Float
   vatAmount       Float
   discountAmount  Float         @default(0)
@@ -282,6 +283,7 @@ model InvoiceItem {
   productId    String?
   productName  String
   productSku   String?
+  description  String? // bê nguyên từ dòng báo giá khi convert
   unitPrice    Float
   vatRate      Float   @default(10)
   discountRate Float   @default(0)

@@ -10,6 +10,7 @@ export type InvoiceItemData = {
   productId: string | null;
   productName: string;
   productSku: string | null;
+  description: string | null; // bê nguyên từ dòng báo giá khi convert
   unitPrice: number;
   vatRate: number;
   discountRate: number;
@@ -48,6 +49,7 @@ export function computeTotals(items: LineItemInput[]): InvoiceTotals {
       productId: item.productId ?? null,
       productName: item.productName,
       productSku: item.productSku ?? null,
+      description: item.description ?? null,
       unitPrice: item.unitPrice,
       vatRate: item.vatRate,
       discountRate: item.discountRate,
@@ -87,6 +89,7 @@ type CreateInvoiceCoreParams = {
   notes?: string | null;
   templateName?: string;
   quotationId?: string;
+  customFields?: Record<string, string> | null; // bê nguyên từ báo giá khi convert
   stockReasonSuffix?: string; // ví dụ: " (chuyển từ báo giá BG000001)"
 };
 
@@ -96,7 +99,7 @@ type CreateInvoiceCoreParams = {
  * (cho phép âm + cảnh báo — SPEC GĐ1, FR-3), ghi StockMovement.
  */
 export async function createInvoiceCore(params: CreateInvoiceCoreParams) {
-  const { session, customerId, totals, notes, templateName, quotationId, stockReasonSuffix } = params;
+  const { session, customerId, totals, notes, templateName, quotationId, customFields, stockReasonSuffix } = params;
 
   const setting = await prisma.setting.findFirst();
   const defaultWh = await getDefaultWarehouse();
@@ -111,6 +114,7 @@ export async function createInvoiceCore(params: CreateInvoiceCoreParams) {
         data: {
           code: invoiceCode,
           quotationId: quotationId ?? null,
+          customFields: customFields ?? {},
           customerId,
           creatorId: session.userId,
           status: 'UNPAID',
