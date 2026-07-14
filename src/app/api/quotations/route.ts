@@ -52,7 +52,11 @@ export async function GET(req: Request) {
       take: limit,
       include: {
         customer: {
-          select: { code: true, name: true, company: true, phone: true },
+          select: {
+            code: true, name: true, company: true, phone: true,
+            tagName: true, tagColor: true,
+            priceTier: { select: { id: true, name: true, color: true } },
+          },
         },
         creator: {
           select: { username: true },

@@ -8,18 +8,35 @@ import {
   LayoutDashboard, Users, Truck, ShoppingBag, Warehouse, 
   FileText, Receipt, Landmark, DollarSign, Settings, 
   LogOut, Menu, X, Sun, Moon, Bell, ChevronRight,
-  User as UserIcon, Sparkles 
+  User as UserIcon, Sparkles, Pin
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, theme, toggleTheme, loading } = useApp();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Sidebar thông minh: "ghim" mở do người dùng chọn, hoặc tự mở khi rê chuột vào lúc đang thu gọn.
+  // Đọc lựa chọn ghim đã lưu ngay lúc khởi tạo state (không phải trong effect) — markup phụ thuộc
+  // giá trị này chỉ hiện sau khi `loading` xong nên không lo lệch hydrate.
+  const [sidebarPinned, setSidebarPinned] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('sidebarPinned');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [sidebarHovering, setSidebarHovering] = useState(false);
+  const sidebarOpen = sidebarPinned || sidebarHovering;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  
+
   const router = useRouter();
   const pathname = usePathname();
+
+  const toggleSidebarPinned = () => {
+    setSidebarPinned((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebarPinned', String(next));
+      return next;
+    });
+  };
 
   // Đóng menu di động khi chuyển trang
   useEffect(() => {
@@ -99,42 +116,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground transition-colors duration-200">
       
-      {/* SIDEBAR TRÊN DESKTOP */}
-      <aside 
-        className={`hidden md:flex flex-col border-r border-border bg-card transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-20'
-        }`}
+      {/* SIDEBAR TRÊN DESKTOP — thu gọn chỉ còn icon khi không ghim, tự mở khi rê chuột vào */}
+      <aside
+        onMouseEnter={() => setSidebarHovering(true)}
+        onMouseLeave={() => setSidebarHovering(false)}
+        className={`hidden md:flex flex-col border-r border-border bg-card transition-all duration-200 ease-out ${
+          sidebarOpen ? 'w-64' : 'w-[68px]'
+        } ${!sidebarPinned ? 'absolute inset-y-0 left-0 z-40 shadow-xl' : 'relative'}`}
       >
         {/* Header của Sidebar */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-border">
-          <Link href="/" className="flex items-center space-x-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+          <Link href="/" className="flex items-center space-x-2.5 min-w-0">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <Sparkles className="h-5 w-5" />
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-lg tracking-tight select-none">Web Hóa Đơn</span>
+              <span className="font-bold text-lg tracking-tight select-none whitespace-nowrap overflow-hidden">Web Hóa Đơn</span>
             )}
           </Link>
+          {sidebarOpen && (
+            <button
+              onClick={toggleSidebarPinned}
+              title={sidebarPinned ? 'Bỏ ghim (tự thu gọn khi rê chuột ra)' : 'Ghim mở sidebar'}
+              className={`rounded-md p-1.5 hover:bg-secondary cursor-pointer flex-shrink-0 ${sidebarPinned ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              <Pin className={`h-4 w-4 ${sidebarPinned ? 'fill-current' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* Danh sách Menu */}
-        <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
+        <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto overflow-x-hidden">
           {filteredNavItems.map((item) => {
             const isActive = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
             const Icon = item.icon;
-            
+
             return (
               <Link
                 key={item.name}
                 href={item.path}
+                title={sidebarOpen ? undefined : item.name}
                 className={`group flex items-center rounded-lg px-3 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  isActive 
-                    ? 'bg-primary text-primary-foreground shadow-sm' 
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
                 <Icon className={`h-5 w-5 flex-shrink-0 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                {sidebarOpen && <span>{item.name}</span>}
+                {sidebarOpen && <span className="whitespace-nowrap">{item.name}</span>}
               </Link>
             );
           })}
@@ -144,13 +173,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="p-4 border-t border-border bg-muted/30">
           <button
             onClick={logout}
+            title={sidebarOpen ? undefined : 'Đăng xuất'}
             className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
           >
-            <LogOut className={`h-5 w-5 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-            {sidebarOpen && <span>Đăng xuất</span>}
+            <LogOut className={`h-5 w-5 flex-shrink-0 ${sidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+            {sidebarOpen && <span className="whitespace-nowrap">Đăng xuất</span>}
           </button>
         </div>
       </aside>
+
+      {/* Giữ chỗ đúng bề rộng thu gọn khi sidebar đang "nổi" (không ghim) để nội dung không bị che */}
+      {!sidebarPinned && <div className="hidden md:block w-[68px] flex-shrink-0" />}
 
       {/* MOBILE SIDEBAR (Drawer overlay) */}
       {mobileSidebarOpen && (
@@ -218,9 +251,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="h-5 w-5" />
             </button>
             
-            {/* Nút co giãn Sidebar trên Desktop */}
+            {/* Nút ghim/bỏ ghim Sidebar trên Desktop */}
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={toggleSidebarPinned}
+              title={sidebarPinned ? 'Thu gọn sidebar' : 'Ghim mở sidebar'}
               className="hidden md:flex rounded-md p-1.5 hover:bg-secondary text-muted-foreground cursor-pointer"
             >
               <Menu className="h-5 w-5" />

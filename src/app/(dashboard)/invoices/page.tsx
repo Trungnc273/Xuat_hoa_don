@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { 
+import {
   Plus, Search, Eye,
-  ChevronLeft, ChevronRight, Landmark, XCircle
+  ChevronDown, ChevronLeft, ChevronRight, Landmark, XCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import CustomerTagChip, { type CustomerTagInfo } from '@/components/CustomerTagChip';
 
 interface Invoice {
   id: string;
   code: string;
   customerId: string;
-  customer: { name: string; company: string | null };
+  customer: { name: string; company: string | null; phone: string | null } & CustomerTagInfo;
   date: string;
   status: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
   total: number;
@@ -29,7 +30,8 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  
+  const [expandedCustomerIds, setExpandedCustomerIds] = useState<Set<string>>(new Set());
+
   const { user } = useApp();
 
   const fetchInvoices = useCallback(async () => {
@@ -79,9 +81,46 @@ export default function InvoicesPage() {
     }
   };
 
+  // Gộp hóa đơn theo khách hàng — cùng khuôn với danh sách Báo giá để nhất quán trải nghiệm
+  const groupedInvoices = useMemo(() => {
+    const groups = new Map<string, { customerId: string; customer: Invoice['customer']; invoices: Invoice[]; total: number; remaining: number }>();
+
+    invoices.forEach((invoice) => {
+      const currentGroup = groups.get(invoice.customerId);
+      if (currentGroup) {
+        currentGroup.invoices.push(invoice);
+        currentGroup.total += invoice.total;
+        currentGroup.remaining += invoice.remainingAmount;
+        return;
+      }
+
+      groups.set(invoice.customerId, {
+        customerId: invoice.customerId,
+        customer: invoice.customer,
+        invoices: [invoice],
+        total: invoice.total,
+        remaining: invoice.remainingAmount,
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [invoices]);
+
+  const toggleCustomerGroup = (customerId: string) => {
+    setExpandedCustomerIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(customerId)) {
+        nextIds.delete(customerId);
+      } else {
+        nextIds.add(customerId);
+      }
+      return nextIds;
+    });
+  };
+
   return (
     <div className="space-y-6">
-      
+
       {/* HEADER VÀ NÚT TẠO MỚI */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -131,19 +170,19 @@ export default function InvoicesPage() {
         </select>
       </div>
 
-      {/* BẢNG HÓA ĐƠN */}
+      {/* BẢNG HÓA ĐƠN — GỘP THEO KHÁCH HÀNG */}
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
                 <th className="p-3">Số hóa đơn</th>
-                <th className="p-3">Khách hàng</th>
                 <th className="p-3">Ngày xuất</th>
                 <th className="p-3">Giá trị hóa đơn</th>
                 <th className="p-3">Đã thu</th>
                 <th className="p-3">Còn nợ</th>
                 <th className="p-3">Trạng thái</th>
+                <th className="p-3">Người tạo</th>
                 <th className="p-3 text-right">Chức năng</th>
               </tr>
             </thead>
@@ -152,67 +191,97 @@ export default function InvoicesPage() {
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-muted-foreground">Đang tải danh sách hóa đơn...</td>
                 </tr>
-              ) : invoices.length === 0 ? (
+              ) : groupedInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-muted-foreground">Không tìm thấy hóa đơn nào.</td>
                 </tr>
               ) : (
-                invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-muted/10 transition-colors">
-                    <td className="p-3 font-bold text-foreground">
-                      <Link href={`/invoices/${inv.id}`} className="hover:underline">{inv.code}</Link>
-                    </td>
-                    <td className="p-3 font-semibold text-foreground">
-                      {inv.customer.name}
-                      {inv.customer.company && <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate max-w-[150px]">{inv.customer.company}</p>}
-                    </td>
-                    <td className="p-3 text-muted-foreground">{formatDate(inv.date)}</td>
-                    <td className="p-3 font-bold text-foreground">{formatCurrency(inv.total)}</td>
-                    <td className="p-3 font-semibold text-emerald-500">{formatCurrency(inv.paidAmount)}</td>
-                    <td className="p-3 font-semibold text-destructive">{formatCurrency(inv.remainingAmount)}</td>
-                    <td className="p-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                        inv.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' :
-                        inv.status === 'PARTIALLY_PAID' ? 'bg-blue-500/10 text-blue-500' :
-                        inv.status === 'CANCELLED' ? 'bg-muted text-muted-foreground' :
-                        'bg-amber-500/10 text-amber-500'
-                      }`}>
-                        {inv.status === 'PAID' ? 'Đã thu tiền' :
-                         inv.status === 'PARTIALLY_PAID' ? 'Trả một phần' :
-                         inv.status === 'CANCELLED' ? 'Đã hủy' : 'Chưa thu tiền'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Link
-                          href={`/invoices/${inv.id}`}
-                          className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
-                          title="Xem chi tiết & In"
+                groupedInvoices.map((group) => {
+                  const isExpanded = expandedCustomerIds.has(group.customerId);
+                  const isDimmed = expandedCustomerIds.size > 0 && !isExpanded;
+
+                  return (
+                  <React.Fragment key={group.customerId}>
+                    <tr className={`bg-muted/30 hover:bg-muted/50 transition-opacity duration-200 ${isDimmed ? 'opacity-40 hover:opacity-80' : ''}`}>
+                      <td colSpan={8} className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomerGroup(group.customerId)}
+                          className="flex w-full flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between"
+                          aria-expanded={isExpanded}
                         >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && ['ADMIN', 'ACCOUNTANT'].includes(user?.role || '') && (
-                          <Link
-                            href={`/receipts?invoiceId=${inv.id}`}
-                            className="rounded p-1 hover:bg-emerald-500/10 text-emerald-500 hover:text-emerald-600 cursor-pointer"
-                            title="Lập phiếu thu tiền"
-                          >
-                            <Landmark className="h-4 w-4" />
-                          </Link>
-                        )}
-                        {inv.status !== 'CANCELLED' && ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(user?.role || '') && (
-                          <button
-                            onClick={() => handleCancelInvoice(inv.id)}
-                            className="rounded p-1 hover:bg-destructive/10 text-destructive cursor-pointer"
-                            title="Hủy hóa đơn (Hoàn kho)"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <span className="flex min-w-0 items-center gap-2">
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                            <span className="min-w-0 font-bold text-foreground">
+                              {group.customer.name}
+                              {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
+                              {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
+                            </span>
+                            <CustomerTagChip customer={group.customer} />
+                          </span>
+                          <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
+                            {group.invoices.length} hóa đơn - Tổng {formatCurrency(group.total)}
+                            {group.remaining > 0 && <span className="text-destructive"> · Còn nợ {formatCurrency(group.remaining)}</span>}
+                          </span>
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && group.invoices.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-muted/10 transition-colors">
+                        <td className="p-3 pl-8 font-bold text-foreground">
+                          <Link href={`/invoices/${inv.id}`} className="hover:underline">{inv.code}</Link>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{formatDate(inv.date)}</td>
+                        <td className="p-3 font-bold text-foreground">{formatCurrency(inv.total)}</td>
+                        <td className="p-3 font-semibold text-emerald-500">{formatCurrency(inv.paidAmount)}</td>
+                        <td className="p-3 font-semibold text-destructive">{formatCurrency(inv.remainingAmount)}</td>
+                        <td className="p-3">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                            inv.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' :
+                            inv.status === 'PARTIALLY_PAID' ? 'bg-blue-500/10 text-blue-500' :
+                            inv.status === 'CANCELLED' ? 'bg-muted text-muted-foreground' :
+                            'bg-amber-500/10 text-amber-500'
+                          }`}>
+                            {inv.status === 'PAID' ? 'Đã thu tiền' :
+                             inv.status === 'PARTIALLY_PAID' ? 'Trả một phần' :
+                             inv.status === 'CANCELLED' ? 'Đã hủy' : 'Chưa thu tiền'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground capitalize">{inv.creator.username}</td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Link
+                              href={`/invoices/${inv.id}`}
+                              className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                              title="Xem chi tiết & In"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && ['ADMIN', 'ACCOUNTANT'].includes(user?.role || '') && (
+                              <Link
+                                href={`/receipts?invoiceId=${inv.id}`}
+                                className="rounded p-1 hover:bg-emerald-500/10 text-emerald-500 hover:text-emerald-600 cursor-pointer"
+                                title="Lập phiếu thu tiền"
+                              >
+                                <Landmark className="h-4 w-4" />
+                              </Link>
+                            )}
+                            {inv.status !== 'CANCELLED' && ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(user?.role || '') && (
+                              <button
+                                onClick={() => handleCancelInvoice(inv.id)}
+                                className="rounded p-1 hover:bg-destructive/10 text-destructive cursor-pointer"
+                                title="Hủy hóa đơn (Hoàn kho)"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -52,7 +52,11 @@ export async function GET(req: Request) {
       take: limit,
       include: {
         customer: {
-          select: { code: true, name: true, company: true },
+          select: {
+            code: true, name: true, company: true, phone: true,
+            tagName: true, tagColor: true,
+            priceTier: { select: { id: true, name: true, color: true } },
+          },
         },
         creator: {
           select: { username: true },
@@ -91,6 +95,7 @@ export async function POST(req: Request) {
       totals,
       notes: input.notes,
       templateName: input.templateName,
+      customFields: input.customFields,
     });
 
     await logActivity(

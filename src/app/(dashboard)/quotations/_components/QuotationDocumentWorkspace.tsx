@@ -9,10 +9,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   Edit,
+  Image as ImageIcon,
   Plus,
   Printer,
   RefreshCw,
   Save,
+  Search,
   Trash2,
   X,
 } from 'lucide-react';
@@ -54,10 +56,17 @@ interface Product {
   sku: string | null;
   name: string;
   description: string | null;
+  categoryId: string | null;
+  images: string[];
   salePrice: number;
   tierPrices: ProductTierPrice[];
   vatRate: number;
   unit: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 interface Setting {
@@ -175,6 +184,11 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
   const [setting, setSetting] = useState<Setting | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [priceTiers, setPriceTiers] = useState<CustomerPriceTier[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [previewTierId, setPreviewTierId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [status, setStatus] = useState('DRAFT');
@@ -237,13 +251,15 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
         fetch('/api/settings'),
         fetch('/api/customers?limit=999'),
         fetch('/api/products?limit=999'),
+        fetch('/api/categories'),
+        fetch('/api/customer-price-tiers'),
       ];
 
       if (quotationId) {
         requests.push(fetch(`/api/quotations/${quotationId}`));
       }
 
-      const [resSettings, resCustomers, resProducts, resQuotation] = await Promise.all(requests);
+      const [resSettings, resCustomers, resProducts, resCategories, resTiers, resQuotation] = await Promise.all(requests);
 
       if (resSettings.ok) {
         const data = await resSettings.json();
@@ -258,6 +274,16 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
       if (resProducts.ok) {
         const data = await resProducts.json();
         setProducts(data.products);
+      }
+
+      if (resCategories.ok) {
+        const data = await resCategories.json();
+        setCategories(data.categories);
+      }
+
+      if (resTiers.ok) {
+        const data = await resTiers.json();
+        setPriceTiers(data.tiers);
       }
 
       if (quotationId && resQuotation) {
@@ -289,6 +315,8 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
   const handleCustomerChange = (customerId: string) => {
     setSelectedCustomerId(customerId);
     const tier = getCustomerTier(customerId);
+    // Tự đặt bảng giá xem trước ở panel sản phẩm theo đúng phân loại của khách hàng vừa chọn
+    setPreviewTierId(tier.id || '');
 
     setItems((currentItems) => currentItems.map((item) => {
       const product = products.find((p) => p.id === item.productId);
@@ -321,6 +349,64 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
         amount: calculateItemAmount(unitPrice, item.quantity, product.vatRate, item.discountRate),
       };
     }));
+  };
+
+  // Danh sách sản phẩm hiện ở panel bên trái, sau khi lọc theo danh mục + từ khóa tìm kiếm
+  const filteredProducts = useMemo(() => {
+    const keyword = productSearch.trim().toLowerCase();
+    return products.filter((product) => {
+      if (categoryFilter && product.categoryId !== categoryFilter) return false;
+      if (!keyword) return true;
+      return (
+        product.name.toLowerCase().includes(keyword) ||
+        product.code.toLowerCase().includes(keyword) ||
+        (product.sku || '').toLowerCase().includes(keyword)
+      );
+    });
+  }, [products, categoryFilter, productSearch]);
+
+  const previewTierLabel = useMemo(
+    () => priceTiers.find((t) => t.id === previewTierId) || null,
+    [priceTiers, previewTierId]
+  );
+
+  const getPreviewPrice = useCallback(
+    (product: Product) => getProductPriceForTier(product, { id: previewTierId || null, name: null }),
+    [previewTierId]
+  );
+
+  // Bấm 1 sản phẩm ở panel trái: nếu đã có dòng cùng sản phẩm thì tăng số lượng, chưa có thì thêm dòng mới
+  const handleQuickAddProduct = (product: Product) => {
+    const unitPrice = getPreviewPrice(product);
+    setItems((currentItems) => {
+      const existingIndex = currentItems.findIndex((item) => item.productId === product.id);
+      if (existingIndex !== -1) {
+        return currentItems.map((item, i) => {
+          if (i !== existingIndex) return item;
+          const quantity = item.quantity + 1;
+          return { ...item, quantity, amount: calculateItemAmount(item.unitPrice, quantity, item.vatRate, item.discountRate) };
+        });
+      }
+
+      const newRow: QuotationItemInput = {
+        productId: product.id,
+        productName: product.name,
+        productSku: product.sku || '',
+        description: product.description || '',
+        unitPrice,
+        quantity: 1,
+        vatRate: product.vatRate,
+        discountRate: 0,
+        amount: calculateItemAmount(unitPrice, 1, product.vatRate, 0),
+      };
+
+      // Nếu dòng cuối đang trống (chưa chọn sản phẩm), điền luôn vào đó thay vì tạo dòng thừa
+      const lastItem = currentItems[currentItems.length - 1];
+      if (lastItem && !lastItem.productId) {
+        return [...currentItems.slice(0, -1), newRow];
+      }
+      return [...currentItems, newRow];
+    });
   };
 
   const handleItemValueChange = (index: number, field: keyof QuotationItemInput, value: string) => {
@@ -497,7 +583,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
   const creatorName = quotation?.creator?.username || user?.username || 'Admin';
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 max-w-5xl mx-auto">
+    <form onSubmit={handleSave} className={`space-y-6 mx-auto transition-all ${isEditing ? 'max-w-[1400px]' : 'max-w-5xl'}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border pb-4 print:hidden">
         <div className="flex items-center gap-3">
           <Link href="/quotations" className="rounded-lg p-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border">
@@ -560,6 +646,80 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
           {error}
         </div>
       )}
+
+      <div className={isEditing ? 'grid gap-6 lg:grid-cols-[300px_1fr] items-start' : ''}>
+        {/* PANEL SẢN PHẨM BÊN TRÁI — chỉ hiện khi đang tạo/sửa. Bấm 1 sản phẩm để thêm nhanh vào bảng bên phải. */}
+        {isEditing && (
+          <div className="print:hidden lg:sticky lg:top-4 space-y-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="">Tất cả danh mục</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+              <select
+                value={previewTierId}
+                onChange={(e) => setPreviewTierId(e.target.value)}
+                title="Bảng giá dùng để xem trước & thêm dòng — tự đặt theo khách hàng đã chọn"
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="">Giá bán lẻ</option>
+                {priceTiers.map((tier) => (
+                  <option key={tier.id} value={tier.id}>{tier.name}</option>
+                ))}
+              </select>
+            </div>
+            {previewTierLabel && (
+              <div className="flex items-center gap-1.5 px-1 text-[10px] font-bold" style={{ color: previewTierLabel.color }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: previewTierLabel.color }} />
+                Đang xem giá theo: {previewTierLabel.name}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Tìm theo tên, SKU..."
+                className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-2 text-xs focus:outline-none focus:border-foreground"
+              />
+            </div>
+            <div className="max-h-[520px] space-y-1 overflow-y-auto pr-0.5">
+              {filteredProducts.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">Không tìm thấy sản phẩm.</p>
+              ) : (
+                filteredProducts.map((product) => (
+                  <button
+                    type="button"
+                    key={product.id}
+                    onClick={() => handleQuickAddProduct(product)}
+                    title={`Thêm ${product.name} vào báo giá`}
+                    className="flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left hover:bg-secondary transition-colors cursor-pointer"
+                  >
+                    {product.images?.[0] ? (
+                      <Image src={product.images[0]} alt={product.name} width={36} height={36} unoptimized className="h-9 w-9 flex-shrink-0 rounded-md border border-border object-cover bg-muted" />
+                    ) : (
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground">
+                        <ImageIcon className="h-4 w-4" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-foreground">{product.name}</p>
+                      <p className="truncate text-[10px] text-muted-foreground font-mono">{product.code}{product.sku ? ` · ${product.sku}` : ''}</p>
+                    </div>
+                    <span className="flex-shrink-0 text-[10px] font-bold text-primary whitespace-nowrap">{formatCurrency(getPreviewPrice(product))}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
       <div className="bg-card border border-border p-8 md:p-12 rounded-2xl shadow-sm bg-white text-black transition-all print:border-none print:shadow-none print:p-0 print:m-0">
         <style dangerouslySetInnerHTML={{ __html: `
@@ -812,6 +972,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
             </div>
           </div>
         </div>
+      </div>
       </div>
     </form>
   );

@@ -6,6 +6,7 @@ export const createInvoiceSchema = z.object({
   customerId: z.string().uuid('customerId không hợp lệ'),
   notes: optionalStr,
   templateName: z.enum(['DEFAULT', 'MODERN', 'MINIMAL']).default('DEFAULT'),
+  customFields: z.record(z.string(), z.string()).default({}),
   items: z.array(lineItem).min(1, 'Hóa đơn phải có ít nhất 1 sản phẩm'),
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;

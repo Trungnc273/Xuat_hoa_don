@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Ban sao luu CSDL
 backups/
+
+# File người dùng tải lên (dữ liệu runtime, không phải mã nguồn) — chặn commit thêm từ giờ,
+# không đụng các file đã có sẵn trong lịch sử git.
+public/uploads/*

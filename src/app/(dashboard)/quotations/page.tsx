@@ -9,12 +9,13 @@ import {
   ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import CustomerTagChip, { type CustomerTagInfo } from '@/components/CustomerTagChip';
 
 interface Quotation {
   id: string;
   code: string;
   customerId: string;
-  customer: { name: string; company: string | null; phone: string | null };
+  customer: { name: string; company: string | null; phone: string | null } & CustomerTagInfo;
   date: string;
   dueDate: string | null;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
@@ -203,10 +204,11 @@ export default function QuotationsPage() {
               ) : (
                 groupedQuotations.map((group) => {
                   const isExpanded = expandedCustomerIds.has(group.customerId);
+                  const isDimmed = expandedCustomerIds.size > 0 && !isExpanded;
 
                   return (
                   <React.Fragment key={group.customerId}>
-                    <tr className="bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <tr className={`bg-muted/30 hover:bg-muted/50 transition-opacity duration-200 ${isDimmed ? 'opacity-40 hover:opacity-80' : ''}`}>
                       <td colSpan={7} className="px-3 py-2">
                         <button
                           type="button"
@@ -221,6 +223,7 @@ export default function QuotationsPage() {
                               {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
                               {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
                             </span>
+                            <CustomerTagChip customer={group.customer} />
                           </span>
                           <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
                             {group.quotations.length} báo giá - Tổng {formatCurrency(group.total)}
