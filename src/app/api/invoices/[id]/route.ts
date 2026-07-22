@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
+import { handleError, fail } from '@/server/http';
+import { updateInvoiceSchema } from '@/server/validators/sales';
+import { computeTotals, type StockWarning } from '@/server/services/invoice.service';
+import { BusinessError } from '@/server/services/quotation.service';
 
 // 1. GET: Chi tiết hóa đơn và lịch sử phiếu thu
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        customer: true,
+        customer: { include: { priceTier: true } },
         items: true,
         receipts: {
           orderBy: { date: 'desc' },
@@ -63,7 +67,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
-// 2. PUT: Sửa hóa đơn (Đặc biệt xử lý hoàn kho khi HỦY hóa đơn)
+// Tìm hoặc tạo kho mặc định trong transaction (giữ nguyên atomic với các thay đổi kho khác)
+async function getOrCreateDefaultWarehouseTx(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) {
+  const existing = await tx.warehouse.findFirst();
+  if (existing) return existing;
+  return tx.warehouse.create({ data: { code: 'KHO000001', name: 'Kho trung tâm' } });
+}
+
+// 2. PUT: Sửa hóa đơn — hủy (hoàn kho), sửa mặt hàng (hoàn kho cũ + trừ kho mới),
+// sửa ghi chú/thông tin bổ sung/mẫu in, hoặc sửa trực tiếp số tiền đã thu (theo yêu cầu chủ dự án 15/07/2026).
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await verifyAuth(req);
@@ -77,18 +89,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const { id } = await params;
-    const body = await req.json();
-    const { status, notes, templateName } = body;
-
-    // Whitelist trạng thái — không cho ghi chuỗi tùy ý vào chứng từ
-    const VALID_STATUSES = ['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'];
-    if (status !== undefined && !VALID_STATUSES.includes(status)) {
-      return NextResponse.json({ error: 'Trạng thái hóa đơn không hợp lệ' }, { status: 400 });
-    }
+    const input = updateInvoiceSchema.parse(await req.json());
 
     const existingInvoice = await prisma.invoice.findUnique({
       where: { id },
-      include: { items: true },
+      include: { items: true, _count: { select: { receipts: true } } },
     });
 
     if (!existingInvoice) {
@@ -100,35 +105,33 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Hóa đơn đã bị hủy từ trước, không thể sửa đổi' }, { status: 400 });
     }
 
+    // Sửa mặt hàng chỉ an toàn khi CHƯA phát sinh thanh toán — tránh lệch giữa tổng tiền mới
+    // và các phiếu thu/paidAmount đã ghi trước đó
+    if (input.items && (existingInvoice.paidAmount > 0 || existingInvoice._count.receipts > 0)) {
+      return fail('Không thể sửa mặt hàng vì hóa đơn đã có phát sinh thanh toán. Có thể sửa trực tiếp số tiền đã thu nếu cần điều chỉnh.', 400);
+    }
+
+    // Sửa trực tiếp số tiền đã thu (không qua Phiếu thu) — kiểm tra sớm khi biết chắc tổng tiền
+    // (trường hợp không đồng thời sửa items); nếu sửa cùng items, kiểm tra lại trong transaction.
+    if (input.paidAmount !== undefined && !input.items && input.paidAmount > existingInvoice.total) {
+      return fail('Số tiền đã thu không được vượt quá tổng tiền hóa đơn', 400);
+    }
+
+    const stockWarnings: StockWarning[] = [];
+
     // Thực hiện cập nhật trong transaction
     const updated = await prisma.$transaction(async (tx) => {
-      // Nếu trạng thái đổi thành CANCELLED, thực hiện HOÀN KHO sản phẩm
-      if (status === 'CANCELLED' && existingInvoice.status !== 'CANCELLED') {
-        let defaultWh = await tx.warehouse.findFirst();
-        if (!defaultWh) {
-          defaultWh = await tx.warehouse.create({
-            data: {
-              code: 'KHO000001',
-              name: 'Kho trung tâm',
-            },
-          });
-        }
+      // Nếu trạng thái đổi thành CANCELLED, thực hiện HOÀN KHO sản phẩm (giữ nguyên hành vi cũ)
+      if (input.status === 'CANCELLED' && existingInvoice.status !== 'CANCELLED') {
+        const defaultWh = await getOrCreateDefaultWarehouseTx(tx);
 
         for (const item of existingInvoice.items) {
           if (item.productId) {
-            const product = await tx.product.findUnique({
-              where: { id: item.productId },
-            });
-
+            const product = await tx.product.findUnique({ where: { id: item.productId } });
             if (product) {
               const prevStock = product.stock;
               const newStock = prevStock + item.quantity; // Hoàn trả kho
-
-              await tx.product.update({
-                where: { id: item.productId },
-                data: { stock: newStock },
-              });
-
+              await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } });
               await tx.stockMovement.create({
                 data: {
                   type: 'IN',
@@ -146,33 +149,110 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
       }
 
-      // Cập nhật thông tin hóa đơn
+      // Nếu đổi danh sách mặt hàng: hoàn kho theo hàng CŨ, tính lại tổng tiền, trừ kho theo hàng MỚI
+      let newTotals: ReturnType<typeof computeTotals> | null = null;
+      if (input.items) {
+        const defaultWh = await getOrCreateDefaultWarehouseTx(tx);
+
+        for (const item of existingInvoice.items) {
+          if (!item.productId) continue;
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (!product) continue;
+          const prevStock = product.stock;
+          const newStock = prevStock + item.quantity;
+          await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } });
+          await tx.stockMovement.create({
+            data: {
+              type: 'IN', productId: item.productId, quantity: item.quantity, prevStock, newStock,
+              warehouseId: defaultWh.id,
+              reason: `Hoàn kho do sửa hóa đơn ${existingInvoice.code} (cập nhật mặt hàng)`,
+              createdBy: session.username,
+            },
+          });
+        }
+
+        newTotals = computeTotals(input.items);
+
+        await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+        await tx.invoiceItem.createMany({
+          data: newTotals.items.map((item) => ({ ...item, invoiceId: id })),
+        });
+
+        for (const item of newTotals.items) {
+          if (!item.productId) continue;
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (!product) continue;
+          const prevStock = product.stock;
+          const newStock = prevStock - item.quantity; // Tồn kho trung thực: cho phép âm
+          await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } });
+          await tx.stockMovement.create({
+            data: {
+              type: 'OUT', productId: item.productId, quantity: item.quantity, prevStock, newStock,
+              warehouseId: defaultWh.id,
+              reason: `Xuất kho theo sửa hóa đơn ${existingInvoice.code}`,
+              createdBy: session.username,
+            },
+          });
+          if (newStock < 0) {
+            stockWarnings.push({ productId: product.id, productName: product.name, newStock });
+          }
+        }
+      }
+
+      // Tính lại số tiền đã thu / còn nợ / trạng thái
+      const finalTotal = newTotals ? newTotals.total : existingInvoice.total;
+      let finalPaidAmount = existingInvoice.paidAmount;
+      if (input.paidAmount !== undefined) {
+        if (input.paidAmount > finalTotal) {
+          throw new BusinessError('Số tiền đã thu không được vượt quá tổng tiền hóa đơn', 400);
+        }
+        finalPaidAmount = input.paidAmount;
+      }
+      const finalRemaining = Math.max(0, finalTotal - finalPaidAmount);
+      const finalStatus = input.status === 'CANCELLED'
+        ? 'CANCELLED'
+        : finalPaidAmount <= 0 ? 'UNPAID' : finalRemaining <= 0 ? 'PAID' : 'PARTIALLY_PAID';
+
       return tx.invoice.update({
         where: { id },
         data: {
-          status: status || existingInvoice.status,
-          notes: notes !== undefined ? notes : existingInvoice.notes,
-          templateName: templateName || existingInvoice.templateName,
+          status: finalStatus,
+          notes: input.notes !== undefined ? input.notes : existingInvoice.notes,
+          templateName: input.templateName || existingInvoice.templateName,
+          ...(input.customFields !== undefined ? { customFields: input.customFields } : {}),
+          paidAmount: finalPaidAmount,
+          remainingAmount: finalRemaining,
+          ...(newTotals ? {
+            subtotal: newTotals.subtotal,
+            vatAmount: newTotals.vatAmount,
+            discountAmount: newTotals.discountAmount,
+            total: newTotals.total,
+          } : {}),
         },
-        include: { customer: true },
+        include: { customer: { include: { priceTier: true } }, items: true },
       });
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     // Ghi nhật ký
+    const changeNotes = [
+      input.status && `trạng thái ${existingInvoice.status} → ${updated.status}`,
+      input.items && 'cập nhật danh sách mặt hàng',
+      input.paidAmount !== undefined && `sửa trực tiếp số tiền đã thu → ${updated.paidAmount} VND`,
+    ].filter(Boolean).join('; ');
     await prisma.activityLog.create({
       data: {
         userId: session.userId,
         username: session.username,
         action: 'UPDATE_INVOICE',
-        details: `Cập nhật hóa đơn ${updated.code}: Trạng thái đổi từ ${existingInvoice.status} sang ${updated.status}.`,
+        details: `Cập nhật hóa đơn ${updated.code}${changeNotes ? `: ${changeNotes}` : ''}.`,
         ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
       },
     });
 
-    return NextResponse.json({ message: 'Cập nhật hóa đơn thành công', invoice: updated });
+    return NextResponse.json({ message: 'Cập nhật hóa đơn thành công', invoice: updated, stockWarnings });
   } catch (error) {
-    console.error('Lỗi PUT Invoice:', error);
-    return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống' }, { status: 500 });
+    if (error instanceof BusinessError) return fail(error.message, error.status);
+    return handleError('PUT Invoice', error);
   }
 }
 

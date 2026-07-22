@@ -4,15 +4,73 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
+import {
   ArrowLeft, Printer, XCircle, AlertCircle,
-  DollarSign, Layers
+  DollarSign, Layers, Edit, Save, X, Plus, Trash2, RefreshCw, PenLine
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import CustomerTagChip from '@/components/CustomerTagChip';
+
+interface CustomerPriceTier {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface ProductTierPrice {
+  id: string;
+  tierId: string;
+  price: number;
+  tier: CustomerPriceTier;
+}
+
+interface EditableProduct {
+  id: string;
+  code: string;
+  sku: string | null;
+  name: string;
+  description: string | null;
+  salePrice: number;
+  tierPrices: ProductTierPrice[];
+  vatRate: number;
+  unit: string;
+  stock: number;
+}
+
+interface EditItemInput {
+  productId: string;
+  productName: string;
+  productSku: string;
+  description: string;
+  unitPrice: number;
+  quantity: number;
+  vatRate: number;
+  discountRate: number;
+  amount: number;
+}
+
+interface EditCustomFieldEntry {
+  id: string;
+  key: string;
+  value: string;
+}
+
+const calcItemAmount = (price: number, qty: number, vat: number, disc: number) => {
+  const subtotal = price * qty;
+  const discount = subtotal * (disc / 100);
+  const afterDiscount = subtotal - discount;
+  return afterDiscount + afterDiscount * (vat / 100);
+};
+
+const makeEntryId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 interface InvoiceItem {
   id: string;
+  productId: string | null;
   productName: string;
   productSku: string | null;
   unitPrice: number;
@@ -38,6 +96,7 @@ interface InvoiceDetail {
   code: string;
   customerId: string;
   customer: {
+    id: string;
     code: string;
     name: string;
     company: string | null;
@@ -45,6 +104,9 @@ interface InvoiceDetail {
     address: string | null;
     email: string | null;
     phone: string | null;
+    tagName: string | null;
+    tagColor: string | null;
+    priceTier: { id: string; name: string; color: string } | null;
   };
   date: string;
   status: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
@@ -91,7 +153,27 @@ export default function InvoiceDetailPage() {
   const [payError, setPayError] = useState('');
   const [paying, setPaying] = useState(false);
 
+  // Chế độ sửa hóa đơn (mặt hàng, ghi chú, thông tin bổ sung) — như báo giá
+  const [isEditing, setIsEditing] = useState(false);
+  const [products, setProducts] = useState<EditableProduct[]>([]);
+  const [editItems, setEditItems] = useState<EditItemInput[]>([]);
+  const [editNotes, setEditNotes] = useState('');
+  const [editCustomFields, setEditCustomFields] = useState<EditCustomFieldEntry[]>([]);
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [stockWarnings, setStockWarnings] = useState<{ productId: string; productName: string; newStock: number }[]>([]);
+
+  // Sửa trực tiếp số tiền đã thu (độc lập với chế độ sửa mặt hàng — theo yêu cầu chủ dự án 15/07/2026)
+  const [isEditingPaid, setIsEditingPaid] = useState(false);
+  const [editPaidAmount, setEditPaidAmount] = useState('');
+  const [savingPaid, setSavingPaid] = useState(false);
+  const [paidError, setPaidError] = useState('');
+
   const { user } = useApp();
+  const canEditInvoice = ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(user?.role || '');
+  // Chỉ chặn sửa MẶT HÀNG khi đã có thanh toán — vẫn sửa được ghi chú/thông tin bổ sung
+  const hasPayment = (invoice?.paidAmount ?? 0) > 0 || (invoice?.receipts.length ?? 0) > 0;
+
   const fetchData = useCallback(async () => {
     try {
       const [resI, resS] = await Promise.all([
@@ -190,6 +272,188 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  // Bấm "Sửa hóa đơn": nạp danh sách sản phẩm (nếu chưa có) + điền sẵn dữ liệu hiện tại vào form sửa
+  const handleStartEdit = async () => {
+    if (!invoice) return;
+    setEditError('');
+    setEditItems(invoice.items.map((item) => ({
+      productId: item.productId || '',
+      productName: item.productName,
+      productSku: item.productSku || '',
+      description: item.description || '',
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      vatRate: item.vatRate,
+      discountRate: item.discountRate,
+      amount: item.amount,
+    })));
+    setEditNotes(invoice.notes || '');
+    setEditCustomFields(Object.entries(invoice.customFields || {}).map(([key, value]) => ({ id: makeEntryId(), key, value })));
+    setIsEditing(true);
+
+    if (products.length === 0) {
+      try {
+        const res = await fetch('/api/products?limit=999');
+        if (res.ok) setProducts((await res.json()).products);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleCancelEditItems = () => {
+    setIsEditing(false);
+    setEditError('');
+  };
+
+  const getPriceForCustomerTier = (product: EditableProduct) => {
+    const tierId = invoice?.customer.priceTier?.id || null;
+    const matched = tierId ? product.tierPrices.find((tp) => tp.tierId === tierId) : null;
+    return matched?.price ?? product.salePrice;
+  };
+
+  const handleEditProductChange = (index: number, productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const unitPrice = getPriceForCustomerTier(product);
+    setEditItems((cur) => cur.map((item, i) => {
+      if (i !== index) return item;
+      return {
+        ...item,
+        productId: product.id,
+        productName: product.name,
+        productSku: product.sku || '',
+        description: product.description || item.description || '',
+        unitPrice,
+        vatRate: product.vatRate,
+        amount: calcItemAmount(unitPrice, item.quantity, product.vatRate, item.discountRate),
+      };
+    }));
+  };
+
+  const handleEditItemValueChange = (index: number, field: keyof EditItemInput, value: string) => {
+    setEditItems((cur) => cur.map((item, i) => {
+      if (i !== index) return item;
+      let numericValue = parseFloat(value) || 0;
+      if (field === 'quantity') numericValue = parseInt(value, 10) || 1;
+      const updated = { ...item, [field]: numericValue };
+      updated.amount = calcItemAmount(
+        field === 'unitPrice' ? numericValue : item.unitPrice,
+        field === 'quantity' ? numericValue : item.quantity,
+        field === 'vatRate' ? numericValue : item.vatRate,
+        field === 'discountRate' ? numericValue : item.discountRate
+      );
+      return updated;
+    }));
+  };
+
+  const handleEditItemDescriptionChange = (index: number, value: string) => {
+    setEditItems((cur) => cur.map((item, i) => (i === index ? { ...item, description: value } : item)));
+  };
+
+  const addEditRow = () => setEditItems((cur) => [...cur, {
+    productId: '', productName: '', productSku: '', description: '',
+    unitPrice: 0, quantity: 1, vatRate: 10, discountRate: 0, amount: 0,
+  }]);
+  const removeEditRow = (index: number) => setEditItems((cur) => cur.filter((_, i) => i !== index));
+
+  const addEditCustomField = () => setEditCustomFields((cur) => [...cur, { id: makeEntryId(), key: '', value: '' }]);
+  const updateEditCustomField = (fid: string, field: 'key' | 'value', value: string) =>
+    setEditCustomFields((cur) => cur.map((e) => (e.id === fid ? { ...e, [field]: value } : e)));
+  const removeEditCustomField = (fid: string) => setEditCustomFields((cur) => cur.filter((e) => e.id !== fid));
+
+  const editTotal = editItems.reduce((sum, item) => sum + item.amount, 0);
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError('');
+
+    if (!hasPayment) {
+      if (editItems.length === 0) {
+        setEditError('Vui lòng chọn ít nhất 1 sản phẩm');
+        return;
+      }
+      if (editItems.some((item) => !item.productId)) {
+        setEditError('Có dòng sản phẩm chưa được chọn hàng hóa cụ thể');
+        return;
+      }
+    }
+
+    setSavingEdit(true);
+    try {
+      const body: Record<string, unknown> = {
+        notes: editNotes,
+        customFields: editCustomFields.reduce<Record<string, string>>((acc, f) => {
+          const key = f.key.trim();
+          if (key) acc[key] = f.value.trim();
+          return acc;
+        }, {}),
+      };
+      // Chỉ gửi items khi được phép sửa (chưa phát sinh thanh toán) — tránh 400 từ server
+      if (!hasPayment) body.items = editItems;
+
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.details?.[0]?.message || data.error || 'Không lưu được thay đổi');
+        return;
+      }
+      setStockWarnings(data.stockWarnings || []);
+      setIsEditing(false);
+      void fetchData();
+    } catch {
+      setEditError('Đã xảy ra lỗi kết nối');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Sửa trực tiếp số tiền đã thu (không qua Phiếu thu) — độc lập với chế độ sửa mặt hàng
+  const handleStartEditPaid = () => {
+    if (!invoice) return;
+    setPaidError('');
+    setEditPaidAmount(invoice.paidAmount.toString());
+    setIsEditingPaid(true);
+  };
+
+  const handleSavePaidAmount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPaidError('');
+    const amt = Number(editPaidAmount);
+    if (Number.isNaN(amt) || amt < 0) {
+      setPaidError('Số tiền không hợp lệ');
+      return;
+    }
+    if (invoice && amt > invoice.total) {
+      setPaidError('Số tiền đã thu không được vượt quá tổng tiền hóa đơn');
+      return;
+    }
+
+    setSavingPaid(true);
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paidAmount: amt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPaidError(data.error || 'Không lưu được thay đổi');
+        return;
+      }
+      setIsEditingPaid(false);
+      void fetchData();
+    } catch {
+      setPaidError('Lỗi kết nối máy chủ');
+    } finally {
+      setSavingPaid(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full w-full items-center justify-center min-h-[400px]">
@@ -211,9 +475,43 @@ export default function InvoiceDetailPage() {
     );
   }
 
+  // Dòng "Đã thanh toán" dùng chung cho cả 3 mẫu — có thể sửa trực tiếp tại chỗ
+  const paidAmountBlock = isEditingPaid ? (
+    <form onSubmit={handleSavePaidAmount} className="rounded-lg border border-dashed border-emerald-400 p-2 space-y-1.5 print:hidden">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-gray-500">Đã thanh toán:</span>
+        <input
+          type="number" min="0" step="1000" autoFocus
+          value={editPaidAmount}
+          onChange={(e) => setEditPaidAmount(e.target.value)}
+          className="w-32 rounded border border-gray-300 px-2 py-1 text-right font-bold"
+        />
+      </div>
+      {paidError && <p className="text-[10px] text-red-500">{paidError}</p>}
+      <div className="flex justify-end gap-1.5">
+        <button type="button" onClick={() => setIsEditingPaid(false)} className="rounded px-2 py-1 text-[10px] font-bold border border-gray-300 hover:bg-gray-50">Hủy</button>
+        <button type="submit" disabled={savingPaid} className="rounded px-2 py-1 text-[10px] font-bold bg-emerald-600 text-white hover:opacity-90 disabled:opacity-50">
+          {savingPaid ? 'Đang lưu...' : 'Lưu'}
+        </button>
+      </div>
+    </form>
+  ) : (
+    <div className="flex justify-between items-center text-emerald-600">
+      <span>Đã thanh toán:</span>
+      <span className="inline-flex items-center gap-1.5">
+        {formatCurrency(invoice.paidAmount)}
+        {canEditInvoice && invoice.status !== 'CANCELLED' && (
+          <button type="button" onClick={handleStartEditPaid} title="Sửa số tiền đã thu" className="print:hidden text-gray-400 hover:text-emerald-600 cursor-pointer">
+            <PenLine className="h-3 w-3" />
+          </button>
+        )}
+      </span>
+    </div>
+  );
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      
+
       {/* THANH ĐIỀU HƯỚNG VÀ PHÍM TÁC VỤ (HẨN KHI IN) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border pb-4 print:hidden">
         <div className="flex items-center gap-3">
@@ -242,15 +540,27 @@ export default function InvoiceDetailPage() {
             </select>
           </div>
 
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
-          >
-            <Printer className="h-4 w-4" />
-            In hóa đơn
-          </button>
-          
-          {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && ['ADMIN', 'ACCOUNTANT'].includes(user?.role || '') && (
+          {!isEditing && (
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
+            >
+              <Printer className="h-4 w-4" />
+              In hóa đơn
+            </button>
+          )}
+
+          {!isEditing && canEditInvoice && invoice.status !== 'CANCELLED' && (
+            <button
+              onClick={handleStartEdit}
+              className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer"
+            >
+              <Edit className="h-4 w-4" />
+              Sửa hóa đơn
+            </button>
+          )}
+
+          {!isEditing && invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && ['ADMIN', 'ACCOUNTANT'].includes(user?.role || '') && (
             <button
               onClick={() => { setPayError(''); setIsPayOpen(true); }}
               className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-xs font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
@@ -259,10 +569,160 @@ export default function InvoiceDetailPage() {
               Thu tiền hóa đơn
             </button>
           )}
+
+          {isEditing && (
+            <>
+              <button type="button" onClick={handleCancelEditItems} className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-3.5 py-2 text-xs font-bold hover:bg-secondary cursor-pointer">
+                <X className="h-4 w-4" />
+                Hủy sửa
+              </button>
+              <button type="button" onClick={handleSaveEdit} disabled={savingEdit} className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-xs font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer">
+                {savingEdit ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {stockWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-xs font-semibold text-amber-700 dark:text-amber-400 print:hidden">
+          ⚠ Một số sản phẩm đã âm tồn kho sau khi lưu, cần nhập bù: {stockWarnings.map((w) => `${w.productName} (${w.newStock})`).join(', ')}
+        </div>
+      )}
+
+      {/* CHẾ ĐỘ SỬA HÓA ĐƠN — mặt hàng, ghi chú, thông tin bổ sung (giống báo giá) */}
+      {isEditing && (
+        <div className="bg-card border border-border p-6 md:p-8 rounded-2xl shadow-sm bg-white text-black space-y-6">
+          {editError && (
+            <div className="rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-600 border border-red-200 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {editError}
+            </div>
+          )}
+
+          {hasPayment && (
+            <div className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-700 border border-amber-200">
+              Hóa đơn đã có phát sinh thanh toán nên không thể sửa mặt hàng — chỉ sửa được ghi chú và thông tin bổ sung.
+              Muốn điều chỉnh số tiền đã thu, dùng nút bút chì cạnh dòng &quot;Đã thanh toán&quot;.
+            </div>
+          )}
+
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Khách hàng</h3>
+            <p className="font-bold text-gray-800 flex items-center gap-2 flex-wrap">
+              {invoice.customer.name}
+              <CustomerTagChip customer={invoice.customer} />
+            </p>
+            <p className="text-gray-500 mt-1">Không thể đổi khách hàng khi sửa hóa đơn.</p>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="font-bold uppercase tracking-wider text-gray-500">Thông tin bổ sung</h3>
+              <button type="button" onClick={addEditCustomField} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1.5 font-bold text-gray-800 hover:bg-gray-50">
+                <Plus className="h-3.5 w-3.5" />
+                Thêm trường
+              </button>
+            </div>
+            <div className="space-y-2">
+              {editCustomFields.length === 0 && <p className="text-gray-500">Chưa có trường bổ sung.</p>}
+              {editCustomFields.map((field) => (
+                <div key={field.id} className="grid gap-2 sm:grid-cols-[minmax(0,220px)_1fr_auto]">
+                  <input type="text" value={field.key} onChange={(e) => updateEditCustomField(field.id, 'key', e.target.value)} className="rounded border border-gray-300 bg-white px-2 py-1.5 font-semibold" placeholder="Tên trường" />
+                  <input type="text" value={field.value} onChange={(e) => updateEditCustomField(field.id, 'value', e.target.value)} className="rounded border border-gray-300 bg-white px-2 py-1.5" placeholder="Giá trị" />
+                  <button type="button" onClick={() => removeEditCustomField(field.id)} className="rounded p-1.5 text-red-500 hover:bg-red-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mặt hàng</h3>
+              {!hasPayment && (
+                <button type="button" onClick={addEditRow} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50">
+                  <Plus className="h-3.5 w-3.5" />
+                  Thêm dòng
+                </button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-gray-300 bg-gray-100 text-gray-700 font-bold">
+                    <th className="py-2.5 px-2 w-10 text-center">STT</th>
+                    <th className="py-2.5 px-2">Tên hàng hóa, dịch vụ</th>
+                    <th className="py-2.5 px-2">Mô tả</th>
+                    <th className="py-2.5 px-2 w-16 text-center">SL</th>
+                    <th className="py-2.5 px-2 w-28 text-right">Đơn giá</th>
+                    <th className="py-2.5 px-2 w-28 text-right">Thành tiền</th>
+                    {!hasPayment && <th className="py-2.5 px-2 w-10" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {editItems.map((item, index) => (
+                    <tr key={index} className="align-top">
+                      <td className="py-2.5 px-2 text-center text-gray-500">{index + 1}</td>
+                      <td className="py-2.5 px-2">
+                        {hasPayment ? (
+                          <>
+                            <p className="font-bold text-gray-800">{item.productName}</p>
+                            {item.productSku && <p className="text-[10px] text-gray-500 font-mono mt-0.5">{item.productSku}</p>}
+                          </>
+                        ) : (
+                          <select required value={item.productId} onChange={(e) => handleEditProductChange(index, e.target.value)} className="w-full min-w-40 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs font-semibold">
+                            <option value="">-- Chọn sản phẩm --</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name} ({p.code} - Kho: {p.stock})</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 text-gray-600">
+                        <textarea value={item.description} onChange={(e) => handleEditItemDescriptionChange(index, e.target.value)} rows={2} className="w-full min-w-36 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs" />
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-semibold text-gray-800">
+                        {hasPayment ? item.quantity : (
+                          <input type="number" min="1" required value={item.quantity} onChange={(e) => handleEditItemValueChange(index, 'quantity', e.target.value)} className="w-16 rounded border border-gray-300 px-1 py-1 text-center" />
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 text-right text-gray-600">
+                        {hasPayment ? formatCurrency(item.unitPrice) : (
+                          <input type="number" min="0" required value={item.unitPrice} onChange={(e) => handleEditItemValueChange(index, 'unitPrice', e.target.value)} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" />
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
+                      {!hasPayment && (
+                        <td className="py-2.5 px-2">
+                          <button type="button" onClick={() => removeEditRow(index)} className="rounded p-1 text-red-500 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <div className="text-sm font-black text-gray-800">
+                Tổng tiền: <span className="text-base">{formatCurrency(editTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="font-bold text-gray-700 text-xs mb-1.5">Ghi chú:</p>
+            <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} className="w-full rounded border border-gray-300 px-3 py-2 text-xs italic" placeholder="Ghi chú, hình thức thanh toán, giao hàng..." />
+          </div>
+        </div>
+      )}
+
       {/* TẤM IN HÓA ĐƠN A4 DỰA TRÊN CẤU HÌNH TEMPLATE */}
+      {!isEditing && (
       <div className="bg-card border border-border rounded-2xl shadow-sm bg-white text-black transition-all print:border-none print:shadow-none print:p-0 print:m-0">
         
         <style dangerouslySetInnerHTML={{__html: `
@@ -313,7 +773,10 @@ export default function InvoiceDetailPage() {
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Thông tin người mua hàng:</h3>
               <div className="grid gap-2 sm:grid-cols-2 text-xs">
                 <div>
-                  <p className="font-bold text-gray-800">{invoice.customer.name}</p>
+                  <p className="font-bold text-gray-800 flex items-center gap-2 flex-wrap">
+                    {invoice.customer.name}
+                    <CustomerTagChip customer={invoice.customer} />
+                  </p>
                   {invoice.customer.company && <p className="font-semibold text-gray-700 mt-0.5">{invoice.customer.company}</p>}
                   {invoice.customer.address && <p className="text-gray-600 mt-0.5">Địa chỉ: {invoice.customer.address}</p>}
                 </div>
@@ -333,8 +796,6 @@ export default function InvoiceDetailPage() {
                     <th className="py-2.5 px-2">Tên hàng hóa, dịch vụ</th>
                     <th className="py-2.5 px-2 w-16 text-center">SL</th>
                     <th className="py-2.5 px-2 w-28 text-right">Đơn giá</th>
-                    <th className="py-2.5 px-2 w-16 text-center">VAT</th>
-                    <th className="py-2.5 px-2 w-16 text-center">C.Khấu</th>
                     <th className="py-2.5 px-2 w-28 text-right">Thành tiền</th>
                   </tr>
                 </thead>
@@ -357,8 +818,6 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="py-2.5 px-2 text-center font-semibold text-gray-800">{item.quantity}</td>
                       <td className="py-2.5 px-2 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                      <td className="py-2.5 px-2 text-center text-gray-500">{item.vatRate}%</td>
-                      <td className="py-2.5 px-2 text-center text-gray-500">{item.discountRate}%</td>
                       <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                     </tr>
                   ))}
@@ -378,26 +837,11 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="space-y-2 text-xs text-gray-700 font-semibold ml-auto w-full max-w-[280px]">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Cộng tiền hàng trước thuế:</span>
-                  <span>{formatCurrency(invoice.subtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center text-red-500">
-                  <span>Chiết khấu:</span>
-                  <span>-{formatCurrency(invoice.discountAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Thuế giá trị gia tăng (VAT):</span>
-                  <span>{formatCurrency(invoice.vatAmount)}</span>
-                </div>
-                <div className="border-t border-gray-300 pt-2 flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center text-sm">
                   <span className="font-black text-gray-800">TỔNG CỘNG:</span>
                   <span className="font-black text-gray-900 text-base">{formatCurrency(invoice.total)}</span>
                 </div>
-                <div className="flex justify-between items-center text-emerald-600">
-                  <span>Đã thanh toán:</span>
-                  <span>{formatCurrency(invoice.paidAmount)}</span>
-                </div>
+                {paidAmountBlock}
                 <div className="border-t border-gray-100 pt-1.5 flex justify-between items-center text-xs text-red-500 font-bold">
                   <span>Dư nợ còn lại:</span>
                   <span>{formatCurrency(invoice.remainingAmount)}</span>
@@ -439,7 +883,10 @@ export default function InvoiceDetailPage() {
             <div className="grid gap-6 sm:grid-cols-2 mt-8 text-xs">
               <div className="border border-indigo-100 p-4 rounded-xl bg-indigo-50/20">
                 <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block mb-2">Thông tin bên mua</span>
-                <p className="font-bold text-sm text-indigo-950">{invoice.customer.name}</p>
+                <p className="font-bold text-sm text-indigo-950 flex items-center gap-2 flex-wrap">
+                  {invoice.customer.name}
+                  <CustomerTagChip customer={invoice.customer} />
+                </p>
                 <p className="text-gray-600 mt-1">{invoice.customer.company || 'Cá nhân mua hàng'}</p>
                 {invoice.customer.address && <p className="text-gray-500 mt-0.5">{invoice.customer.address}</p>}
                 {invoice.customer.phone && <p className="text-gray-500 mt-0.5">SĐT: {invoice.customer.phone}</p>}
@@ -465,7 +912,6 @@ export default function InvoiceDetailPage() {
                     <th className="p-3">Hàng hóa & SKU</th>
                     <th className="p-3 w-16 text-center">SL</th>
                     <th className="p-3 w-28 text-right">Đơn giá</th>
-                    <th className="p-3 w-16 text-center">VAT</th>
                     <th className="p-3 w-28 text-right">Thành tiền</th>
                   </tr>
                 </thead>
@@ -489,7 +935,6 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="p-3 text-center font-bold text-gray-800">{item.quantity}</td>
                       <td className="p-3 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                      <td className="p-3 text-center text-gray-500">{item.vatRate}%</td>
                       <td className="p-3 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                     </tr>
                   ))}
@@ -512,26 +957,11 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="w-full sm:w-72 space-y-2 text-xs font-semibold text-gray-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Giá trị trước thuế:</span>
-                  <span>{formatCurrency(invoice.subtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center text-red-500">
-                  <span>Chiết khấu hàng bán:</span>
-                  <span>-{formatCurrency(invoice.discountAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Thuế GTGT (VAT):</span>
-                  <span>{formatCurrency(invoice.vatAmount)}</span>
-                </div>
                 <div className="border-t-2 border-indigo-600 pt-2 flex justify-between items-center text-sm font-extrabold text-indigo-950">
                   <span>TỔNG CỘNG:</span>
                   <span className="text-base">{formatCurrency(invoice.total)}</span>
                 </div>
-                <div className="flex justify-between items-center text-emerald-600">
-                  <span>Đã thu tiền:</span>
-                  <span>{formatCurrency(invoice.paidAmount)}</span>
-                </div>
+                {paidAmountBlock}
                 <div className="border-t border-gray-100 pt-1 flex justify-between items-center text-xs text-red-500 font-bold">
                   <span>Dư nợ còn lại:</span>
                   <span>{formatCurrency(invoice.remainingAmount)}</span>
@@ -559,7 +989,10 @@ export default function InvoiceDetailPage() {
             <div className="mt-8 text-xs grid grid-cols-2 gap-4">
               <div>
                 <p className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Bill To:</p>
-                <p className="font-bold text-gray-900 mt-1">{invoice.customer.name}</p>
+                <p className="font-bold text-gray-900 mt-1 flex items-center gap-2 flex-wrap">
+                  {invoice.customer.name}
+                  <CustomerTagChip customer={invoice.customer} />
+                </p>
                 <p className="text-gray-600">{invoice.customer.company || 'Individual Client'}</p>
                 <p className="text-gray-500">{invoice.customer.address || ''}</p>
               </div>
@@ -608,21 +1041,14 @@ export default function InvoiceDetailPage() {
 
             <div className="mt-8 flex justify-end">
               <div className="w-64 space-y-2 text-xs font-semibold text-gray-800">
-                <div className="flex justify-between items-center text-gray-500">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(invoice.subtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center text-red-500">
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(invoice.discountAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-500">
-                  <span>VAT:</span>
-                  <span>{formatCurrency(invoice.vatAmount)}</span>
-                </div>
                 <div className="border-t border-gray-900 pt-2 flex justify-between items-center text-sm font-bold text-gray-900">
                   <span>Total Amount:</span>
                   <span>{formatCurrency(invoice.total)}</span>
+                </div>
+                {paidAmountBlock}
+                <div className="border-t border-gray-100 pt-1.5 flex justify-between items-center text-red-500 font-bold">
+                  <span>Dư nợ còn lại:</span>
+                  <span>{formatCurrency(invoice.remainingAmount)}</span>
                 </div>
               </div>
             </div>
@@ -655,6 +1081,7 @@ export default function InvoiceDetailPage() {
         )}
 
       </div>
+      )}
 
       {/* MODAL LẬP PHIẾU THU TIỀN */}
       {isPayOpen && (

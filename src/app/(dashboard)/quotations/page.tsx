@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import CustomerTagChip, { type CustomerTagInfo } from '@/components/CustomerTagChip';
+import { type CustomerTagInfo } from '@/components/CustomerTagChip';
 
 interface Quotation {
   id: string;
@@ -223,7 +223,6 @@ export default function QuotationsPage() {
                               {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
                               {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
                             </span>
-                            <CustomerTagChip customer={group.customer} />
                           </span>
                           <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
                             {group.quotations.length} báo giá - Tổng {formatCurrency(group.total)}

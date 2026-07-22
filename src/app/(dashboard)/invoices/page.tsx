@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
-import CustomerTagChip, { type CustomerTagInfo } from '@/components/CustomerTagChip';
+import { type CustomerTagInfo } from '@/components/CustomerTagChip';
 
 interface Invoice {
   id: string;
@@ -217,7 +217,6 @@ export default function InvoicesPage() {
                               {group.customer.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.company}</span>}
                               {group.customer.phone && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.customer.phone}</span>}
                             </span>
-                            <CustomerTagChip customer={group.customer} />
                           </span>
                           <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
                             {group.invoices.length} hóa đơn - Tổng {formatCurrency(group.total)}

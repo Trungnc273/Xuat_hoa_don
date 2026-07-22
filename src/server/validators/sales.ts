@@ -11,6 +11,18 @@ export const createInvoiceSchema = z.object({
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 
+/** PUT /api/invoices/[id] — mọi trường đều optional (cập nhật từng phần) */
+export const updateInvoiceSchema = z.object({
+  status: z.enum(['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED']).optional(),
+  // Không dùng optionalStr ở đây vì cần phân biệt "" (xóa ghi chú) với undefined (không đổi)
+  notes: z.string().trim().max(2000, 'Quá dài').optional(),
+  templateName: z.enum(['DEFAULT', 'MODERN', 'MINIMAL']).optional(),
+  customFields: z.record(z.string(), z.string()).optional(),
+  items: z.array(lineItem).min(1, 'Hóa đơn phải có ít nhất 1 sản phẩm').optional(),
+  paidAmount: z.coerce.number().min(0, 'Số tiền không được âm').optional(),
+});
+export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
+
 /** POST /api/quotations */
 export const createQuotationSchema = z.object({
   customerId: z.string().uuid('customerId không hợp lệ'),

@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const quotation = await prisma.quotation.findUnique({
       where: { id },
       include: {
-        customer: true,
+        customer: { include: { priceTier: true } },
         items: true,
         creator: {
           select: { username: true, email: true },

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import CustomerTagChip from '@/components/CustomerTagChip';
 
 type WorkspaceMode = 'create' | 'view';
 
@@ -34,7 +35,9 @@ interface Customer {
   phone: string | null;
   contactPerson: string | null;
   tagName: string | null;
+  tagColor: string | null;
   priceTierId: string | null;
+  priceTier: { id: string; name: string; color: string } | null;
 }
 
 interface CustomerPriceTier {
@@ -147,10 +150,6 @@ const calculateItemAmount = (price: number, qty: number, vat: number, disc: numb
   const discount = subtotal * (disc / 100);
   const afterDiscount = subtotal - discount;
   return afterDiscount + afterDiscount * (vat / 100);
-};
-
-const calculateDiscountedUnitPrice = (price: number, disc: number) => {
-  return price - price * (disc / 100);
 };
 
 const makeCustomFieldId = () => {
@@ -780,7 +779,10 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
           ) : null}
           <div className="grid gap-2 sm:grid-cols-2 text-xs">
             <div>
-              <p className="font-bold text-gray-800">{selectedCustomer?.name || 'Chưa chọn khách hàng'}</p>
+              <p className="font-bold text-gray-800 flex items-center gap-2 flex-wrap">
+                {selectedCustomer?.name || 'Chưa chọn khách hàng'}
+                {selectedCustomer && <CustomerTagChip customer={selectedCustomer} />}
+              </p>
               {selectedCustomer?.company && <p className="font-semibold text-gray-700 mt-0.5">{selectedCustomer.company}</p>}
               {selectedCustomer?.address && <p className="text-gray-600 mt-0.5">Địa chỉ: {selectedCustomer.address}</p>}
             </div>
@@ -862,9 +864,6 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
                   <th className="py-2.5 px-2 w-16 text-center">ĐVT</th>
                   <th className="py-2.5 px-2 w-16 text-center">SL</th>
                   <th className="py-2.5 px-2 w-28 text-right">Đơn giá</th>
-                  <th className="py-2.5 px-2 w-16 text-center">VAT</th>
-                  <th className="py-2.5 px-2 w-16 text-center">C.Khấu</th>
-                  <th className="py-2.5 px-2 w-28 text-right">Đơn giá sau CK</th>
                   <th className="py-2.5 px-2 w-28 text-right">Thành tiền</th>
                   {isEditing && <th className="py-2.5 px-2 w-10 print:hidden" />}
                 </tr>
@@ -872,7 +871,6 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
               <tbody className="divide-y divide-gray-200">
                 {items.map((item, index) => {
                   const product = products.find((p) => p.id === item.productId);
-                  const discountedUnitPrice = calculateDiscountedUnitPrice(item.unitPrice, item.discountRate);
                   return (
                     <tr key={item.id || index} className="hover:bg-gray-50/50 align-top">
                       <td className="py-2.5 px-2 text-center text-gray-500">{index + 1}</td>
@@ -903,13 +901,6 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
                       <td className="py-2.5 px-2 text-right text-gray-600">
                         {isEditing ? <input type="number" min="0" required value={item.unitPrice} onChange={(e) => handleItemValueChange(index, 'unitPrice', e.target.value)} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" /> : formatCurrency(item.unitPrice)}
                       </td>
-                      <td className="py-2.5 px-2 text-center text-gray-500">
-                        {isEditing ? <input type="number" min="0" max="100" value={item.vatRate} onChange={(e) => handleItemValueChange(index, 'vatRate', e.target.value)} className="w-14 rounded border border-gray-300 px-1 py-1 text-center" /> : `${item.vatRate}%`}
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-gray-500">
-                        {isEditing ? <input type="number" min="0" max="100" value={item.discountRate} onChange={(e) => handleItemValueChange(index, 'discountRate', e.target.value)} className="w-14 rounded border border-gray-300 px-1 py-1 text-center" /> : `${item.discountRate}%`}
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-semibold text-gray-700">{formatCurrency(discountedUnitPrice)}</td>
                       <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                       {isEditing && (
                         <td className="py-2.5 px-2 print:hidden">
@@ -928,19 +919,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
 
         <div className="mt-8 flex justify-end">
           <div className="w-80 space-y-2 text-xs text-gray-700 font-semibold">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">Tổng tiền hàng trước thuế:</span>
-              <span>{formatCurrency(totals.subtotal)}</span>
-            </div>
-            <div className="flex justify-between items-center text-red-500">
-              <span>Chiết khấu thương mại:</span>
-              <span>-{formatCurrency(totals.discountAmount)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">Thuế giá trị gia tăng (VAT):</span>
-              <span>{formatCurrency(totals.vatAmount)}</span>
-            </div>
-            <div className="border-t border-gray-300 pt-3 flex justify-between items-center text-sm">
+            <div className="flex justify-between items-center text-sm">
               <span className="font-black text-gray-800 uppercase">Tổng tiền thanh toán:</span>
               <span className="font-black text-gray-900 text-base">{formatCurrency(totals.total)}</span>
             </div>
