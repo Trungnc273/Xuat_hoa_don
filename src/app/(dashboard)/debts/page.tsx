@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { 
+import {
   AlertTriangle,
-  CheckCircle, Clock, ChevronRight,
+  CheckCircle, Clock, ChevronDown, ChevronRight,
   TrendingDown, TrendingUp
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -49,6 +49,7 @@ export default function DebtsPage() {
   const [data, setData] = useState<DebtData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'receivables' | 'payables'>('receivables');
+  const [expandedCustomerIds, setExpandedCustomerIds] = useState<Set<string>>(new Set());
 
   const fetchDebtData = async () => {
     try {
@@ -67,6 +68,54 @@ export default function DebtsPage() {
   useEffect(() => {
     queueMicrotask(() => void fetchDebtData());
   }, []);
+
+  // Gộp hóa đơn còn nợ theo khách hàng — cùng khuôn với danh sách Hóa đơn/Báo giá để nhất quán trải nghiệm
+  const groupedReceivables = useMemo(() => {
+    const groups = new Map<string, {
+      customerId: string;
+      customerName: string;
+      company: string;
+      invoices: Receivable[];
+      total: number;
+      remaining: number;
+      hasOverdue: boolean;
+    }>();
+
+    (data?.receivables || []).forEach((r) => {
+      const currentGroup = groups.get(r.customerId);
+      if (currentGroup) {
+        currentGroup.invoices.push(r);
+        currentGroup.total += r.amount;
+        currentGroup.remaining += r.remainingAmount;
+        currentGroup.hasOverdue = currentGroup.hasOverdue || r.isOverdue;
+        return;
+      }
+
+      groups.set(r.customerId, {
+        customerId: r.customerId,
+        customerName: r.customerName,
+        company: r.company,
+        invoices: [r],
+        total: r.amount,
+        remaining: r.remainingAmount,
+        hasOverdue: r.isOverdue,
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [data?.receivables]);
+
+  const toggleCustomerGroup = (customerId: string) => {
+    setExpandedCustomerIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(customerId)) {
+        nextIds.delete(customerId);
+      } else {
+        nextIds.add(customerId);
+      }
+      return nextIds;
+    });
+  };
 
   if (loading) {
     return (
@@ -164,14 +213,13 @@ export default function DebtsPage() {
       {/* HIỂN THỊ DỮ LIỆU TAB TƯƠNG ỨNG */}
       {activeTab === 'receivables' ? (
         
-        /* BẢNG CÔNG NỢ KHÁCH HÀNG (PHẢI THU) */
+        /* BẢNG CÔNG NỢ KHÁCH HÀNG (PHẢI THU) — GỘP THEO KHÁCH HÀNG */
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
                   <th className="p-3">Hóa đơn nợ</th>
-                  <th className="p-3">Khách hàng</th>
                   <th className="p-3">Giá trị đơn</th>
                   <th className="p-3 text-emerald-500">Đã trả</th>
                   <th className="p-3 text-destructive">Còn nợ</th>
@@ -181,50 +229,83 @@ export default function DebtsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {receivables.length === 0 ? (
+                {groupedReceivables.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-muted-foreground">Tuyệt vời! Không có hóa đơn nào nợ tiền.</td>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">Tuyệt vời! Không có hóa đơn nào nợ tiền.</td>
                   </tr>
                 ) : (
-                  receivables.map((r) => (
-                    <tr key={r.id} className="hover:bg-muted/10 transition-colors">
-                      <td className="p-3 font-bold text-foreground">
-                        <Link href={`/invoices/${r.id}`} className="hover:underline">{r.invoiceCode}</Link>
-                      </td>
-                      <td className="p-3 font-semibold text-foreground">
-                        {r.customerName}
-                        {r.company && <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate max-w-[150px]">{r.company}</p>}
-                      </td>
-                      <td className="p-3 font-semibold text-muted-foreground">{formatCurrency(r.amount)}</td>
-                      <td className="p-3 text-emerald-500 font-semibold">{formatCurrency(r.paidAmount)}</td>
-                      <td className="p-3 text-destructive font-extrabold">{formatCurrency(r.remainingAmount)}</td>
-                      <td className="p-3 text-muted-foreground">{formatDate(r.dueDate)}</td>
-                      <td className="p-3">
-                        {r.isOverdue ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-bold text-destructive">
-                            <Clock className="h-3 w-3" />
-                            Quá hạn {r.overdueDays} ngày
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-500">
-                            <CheckCircle className="h-3 w-3" />
-                            Trong hạn
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <Link
-                            href={`/invoices/${r.id}`}
-                            className="rounded px-2.5 py-1.5 bg-secondary hover:bg-muted font-bold text-[10px] text-foreground border border-border cursor-pointer flex items-center gap-0.5"
+                  groupedReceivables.map((group) => {
+                    const isExpanded = expandedCustomerIds.has(group.customerId);
+                    const isDimmed = expandedCustomerIds.size > 0 && !isExpanded;
+
+                    return (
+                    <React.Fragment key={group.customerId}>
+                      <tr className={`bg-muted/30 hover:bg-muted/50 transition-opacity duration-200 ${isDimmed ? 'opacity-40 hover:opacity-80' : ''}`}>
+                        <td colSpan={7} className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleCustomerGroup(group.customerId)}
+                            className="flex w-full flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between"
+                            aria-expanded={isExpanded}
                           >
-                            Thu nợ nhanh
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <span className="flex min-w-0 items-center gap-2">
+                              <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                              <span className="min-w-0 font-bold text-foreground">
+                                {group.customerName}
+                                {group.company && <span className="ml-2 text-[10px] font-semibold text-muted-foreground">{group.company}</span>}
+                              </span>
+                              {group.hasOverdue && (
+                                <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-bold text-destructive">
+                                  <Clock className="h-3 w-3" />
+                                  Có nợ quá hạn
+                                </span>
+                              )}
+                            </span>
+                            <span className="pl-6 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:pl-0">
+                              {group.invoices.length} hóa đơn - Tổng {formatCurrency(group.total)}
+                              {group.remaining > 0 && <span className="text-destructive"> · Còn nợ {formatCurrency(group.remaining)}</span>}
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && group.invoices.map((r) => (
+                        <tr key={r.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="p-3 pl-8 font-bold text-foreground">
+                            <Link href={`/invoices/${r.id}`} className="hover:underline">{r.invoiceCode}</Link>
+                          </td>
+                          <td className="p-3 font-semibold text-muted-foreground">{formatCurrency(r.amount)}</td>
+                          <td className="p-3 text-emerald-500 font-semibold">{formatCurrency(r.paidAmount)}</td>
+                          <td className="p-3 text-destructive font-extrabold">{formatCurrency(r.remainingAmount)}</td>
+                          <td className="p-3 text-muted-foreground">{formatDate(r.dueDate)}</td>
+                          <td className="p-3">
+                            {r.isOverdue ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-bold text-destructive">
+                                <Clock className="h-3 w-3" />
+                                Quá hạn {r.overdueDays} ngày
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-500">
+                                <CheckCircle className="h-3 w-3" />
+                                Trong hạn
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <Link
+                                href={`/invoices/${r.id}`}
+                                className="rounded px-2.5 py-1.5 bg-secondary hover:bg-muted font-bold text-[10px] text-foreground border border-border cursor-pointer flex items-center gap-0.5"
+                              >
+                                Thu nợ nhanh
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>

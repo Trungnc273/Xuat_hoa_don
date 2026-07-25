@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { 
-  Plus, Search, Edit, Trash2, X, Eye, 
+import { useRouter } from 'next/navigation';
+import {
+  Plus, Search, Edit, Trash2, X, Eye, FileText,
   User, Building2, Phone, Mail,
   AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
@@ -91,6 +92,11 @@ export default function CustomersPage() {
   const [tierError, setTierError] = useState('');
 
   const { user } = useApp();
+  const router = useRouter();
+
+  const goToNewQuotation = (customerId: string) => {
+    router.push(`/quotations/new?customerId=${customerId}`);
+  };
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -436,6 +442,15 @@ export default function CustomersPage() {
                         </button>
                         {['ADMIN', 'MANAGER', 'STAFF'].includes(user?.role || '') && (
                           <button
+                            onClick={() => goToNewQuotation(c.id)}
+                            className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Tạo báo giá cho khách hàng này"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </button>
+                        )}
+                        {['ADMIN', 'MANAGER', 'STAFF'].includes(user?.role || '') && (
+                          <button
                             onClick={() => handleOpenEdit(c)}
                             className="rounded p-1 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
                             title="Sửa"
@@ -501,7 +516,18 @@ export default function CustomersPage() {
               
               {/* Profile nhanh */}
               <div>
-                <h4 className="text-sm font-bold text-foreground capitalize">{selectedCustomer.name}</h4>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-bold text-foreground capitalize">{selectedCustomer.name}</h4>
+                  {['ADMIN', 'MANAGER', 'STAFF'].includes(user?.role || '') && (
+                    <button
+                      onClick={() => goToNewQuotation(selectedCustomer.id)}
+                      className="flex flex-shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Tạo báo giá
+                    </button>
+                  )}
+                </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2">
                   <p className="text-xs text-muted-foreground">{selectedCustomer.code}</p>
                   {(selectedCustomer.priceTier || selectedCustomer.tagName) && (

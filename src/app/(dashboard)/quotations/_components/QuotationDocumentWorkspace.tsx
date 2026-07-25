@@ -126,6 +126,7 @@ interface Props {
   mode: WorkspaceMode;
   quotationId?: string;
   startEditing?: boolean;
+  initialCustomerId?: string;
 }
 
 const emptyItem = (): QuotationItemInput => ({
@@ -176,7 +177,7 @@ const entriesToCustomFields = (entries: CustomFieldEntry[]) => {
   }, {});
 };
 
-export default function QuotationDocumentWorkspace({ mode, quotationId, startEditing = false }: Props) {
+export default function QuotationDocumentWorkspace({ mode, quotationId, startEditing = false, initialCustomerId }: Props) {
   const router = useRouter();
   const { user } = useApp();
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
@@ -310,6 +311,14 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
       queueMicrotask(() => setIsEditing(true));
     }
   }, [mode]);
+
+  // Đến từ trang khách hàng với ?customerId=... → tự chọn sẵn khách hàng đó khi lập báo giá mới
+  useEffect(() => {
+    if (mode !== 'create' || !initialCustomerId || selectedCustomerId) return;
+    if (customers.some((customer) => customer.id === initialCustomerId)) {
+      handleCustomerChange(initialCustomerId);
+    }
+  }, [mode, initialCustomerId, customers, selectedCustomerId]);
 
   const handleCustomerChange = (customerId: string) => {
     setSelectedCustomerId(customerId);
