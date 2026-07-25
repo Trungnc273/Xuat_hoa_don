@@ -96,8 +96,9 @@ export const config = {
      * - _next/static (các tệp tĩnh)
      * - _next/image (tối ưu hóa hình ảnh)
      * - uploads (ảnh sản phẩm/ảnh tải lên)
-     * - favicon.ico (icon trình duyệt)
+     * - brand (logo/ảnh nhận diện thương hiệu, phải hiện được cả khi chưa đăng nhập — vd. trang login)
+     * - favicon.ico, icon (icon trình duyệt, kể cả icon.png do App Router tự sinh route /icon)
      */
-    '/((?!api|uploads|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|uploads|brand|_next/static|_next/image|favicon.ico|icon).*)',
   ],
 };

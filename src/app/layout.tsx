@@ -3,8 +3,8 @@ import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 
 export const metadata: Metadata = {
-  title: "Hệ thống Quản lý Doanh nghiệp - Web Xuất Hóa Đơn",
-  description: "Phần mềm quản lý bán hàng, lập báo giá, hóa đơn, chứng từ thu chi, kho hàng và theo dõi công nợ chuyên nghiệp.",
+  title: "SumFlow - Hệ thống Quản lý Bán hàng & Hóa đơn",
+  description: "SumFlow — phần mềm quản lý bán hàng, lập báo giá, hóa đơn, chứng từ thu chi, kho hàng và theo dõi công nợ chuyên nghiệp.",
 };
 
 export default function RootLayout({

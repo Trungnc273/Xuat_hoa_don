@@ -3,8 +3,9 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useApp } from '@/context/AppContext';
-import { Lock, User, Eye, EyeOff, Sparkles, Moon, Sun } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
 function LoginForm() {
   const [username, setUsername] = useState('');
@@ -67,15 +68,15 @@ function LoginForm() {
 
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center">
-          {/* Logo đại diện dạng tối giản hiện đại */}
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md transition-all hover:scale-105">
-            <Sparkles className="h-6 w-6" />
+          {/* Logo SumFlow */}
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-black/90 shadow-md transition-all hover:scale-105 overflow-hidden">
+            <Image src="/brand/sumflow-logo-96.png" alt="SumFlow" width={56} height={56} className="h-11 w-11 object-contain" priority />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-foreground">
-            Đăng nhập hệ thống
+            SumFlow
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            Nhập tài khoản của bạn để quản lý doanh nghiệp
+            Đăng nhập để quản lý doanh nghiệp của bạn
           </p>
         </div>
 
@@ -148,10 +149,6 @@ function LoginForm() {
               {submitting ? 'Đang xác thực...' : 'Đăng nhập'}
             </button>
           </form>
-
-          <div className="text-center text-xs text-muted-foreground pt-2">
-            Mẫu chạy thử: <code className="bg-secondary px-1 py-0.5 rounded font-mono text-foreground">admin</code> / mật khẩu <code className="bg-secondary px-1 py-0.5 rounded font-mono text-foreground">admin123</code>
-          </div>
 
           <div className="border-t border-border pt-4 text-center">
             <span className="text-sm text-muted-foreground">

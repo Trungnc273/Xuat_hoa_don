@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useApp } from '@/context/AppContext';
-import { 
-  LayoutDashboard, Users, Truck, ShoppingBag, Warehouse, 
-  FileText, Receipt, Landmark, DollarSign, Settings, 
+import {
+  LayoutDashboard, Users, Truck, ShoppingBag, Warehouse,
+  FileText, Receipt, Landmark, DollarSign, Settings,
   LogOut, Menu, X, Sun, Moon, Bell, ChevronRight,
-  User as UserIcon, Sparkles, Pin
+  User as UserIcon, Pin, KeyRound
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -26,9 +27,57 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
+
+  const resetChangePasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangePasswordError('');
+    setChangePasswordSuccess('');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError('');
+    setChangePasswordSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('Mật khẩu mới nhập lại không khớp');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChangePasswordError(data.error || 'Không đổi được mật khẩu');
+        return;
+      }
+      setChangePasswordSuccess('Đổi mật khẩu thành công');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch {
+      setChangePasswordError('Đã xảy ra lỗi hệ thống');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const toggleSidebarPinned = () => {
     setSidebarPinned((prev) => {
@@ -127,11 +176,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Header của Sidebar */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-border">
           <Link href="/" className="flex items-center space-x-2.5 min-w-0">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <Sparkles className="h-5 w-5" />
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-black/90 shadow-sm overflow-hidden">
+              <Image src="/brand/sumflow-logo-96.png" alt="SumFlow" width={36} height={36} className="h-7 w-7 object-contain" />
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-lg tracking-tight select-none whitespace-nowrap overflow-hidden">Web Hóa Đơn</span>
+              <span className="font-bold text-lg tracking-tight select-none whitespace-nowrap overflow-hidden">SumFlow</span>
             )}
           </Link>
           {sidebarOpen && (
@@ -197,10 +246,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="flex h-12 items-center mb-6">
               <Link href="/" className="flex items-center space-x-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                  <Sparkles className="h-4.5 w-4.5" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/90 shadow-sm overflow-hidden">
+                  <Image src="/brand/sumflow-logo-96.png" alt="SumFlow" width={32} height={32} className="h-6 w-6 object-contain" />
                 </div>
-                <span className="font-bold text-base tracking-tight">Web Hóa Đơn</span>
+                <span className="font-bold text-base tracking-tight">SumFlow</span>
               </Link>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -356,6 +405,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     Cấu hình
                   </button>
                   <button
+                    onClick={() => { resetChangePasswordForm(); setChangePasswordOpen(true); }}
+                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                  >
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Đổi mật khẩu
+                  </button>
+                  <button
                     onClick={logout}
                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-all cursor-pointer mt-1"
                   >
@@ -374,6 +430,88 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {/* MODAL ĐỔI MẬT KHẨU */}
+      {changePasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setChangePasswordOpen(false)}
+              className="absolute top-4 right-4 rounded-md p-1 hover:bg-secondary text-muted-foreground cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Đổi mật khẩu
+            </h3>
+
+            {changePasswordError && (
+              <div className="mb-3 text-xs font-semibold text-destructive rounded bg-destructive/10 p-2.5 border border-destructive/20">
+                {changePasswordError}
+              </div>
+            )}
+            {changePasswordSuccess && (
+              <div className="mb-3 text-xs font-semibold text-emerald-500 rounded bg-emerald-500/10 p-2.5 border border-emerald-500/20">
+                {changePasswordSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">Mật khẩu hiện tại</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded border border-border p-2 bg-transparent focus:outline-none focus:border-foreground"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Mật khẩu mới</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded border border-border p-2 bg-transparent focus:outline-none focus:border-foreground"
+                  placeholder="Tối thiểu 6 ký tự"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Nhập lại mật khẩu mới</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded border border-border p-2 bg-transparent focus:outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordOpen(false)}
+                  className="rounded px-4 py-2 border border-border text-foreground hover:bg-secondary cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="rounded px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                >
+                  {changingPassword ? 'Đang lưu...' : 'Đổi mật khẩu'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
