@@ -6,12 +6,16 @@
 
 | Thành phần | Bắt buộc | Ghi chú |
 |---|---|---|
-| Docker Desktop | ✅ | Cách cài: https://www.docker.com/products/docker-desktop — đủ để chạy bản production |
-| Node.js 22 | Chỉ khi lập trình | Chạy dev server, seed, script verify |
-| Git | Chỉ khi lập trình | Kéo code từ https://github.com/Trungnc273/Xuat_hoa_don |
-| ngrok | Chỉ khi demo khách | Xem mục 5 |
+| Docker Desktop | ✅ (luôn luôn) | Cách cài: https://www.docker.com/products/docker-desktop — đủ để chạy bản production |
+| Node.js 22 | ❌ Không cần trên máy khách dùng thật | Chỉ dùng khi lập trình, hoặc 1 lần lúc gieo dữ liệu ban đầu qua Cách A ở mục 2 (Cách B/USB không cần) |
+| Git | ❌ Không cần trên máy khách dùng thật | Chỉ dùng khi lập trình (kéo code từ https://github.com/Trungnc273/Xuat_hoa_don). Cài qua USB (mục 2b) không cần Git |
+| ngrok | Chỉ khi demo khách | Xem mục 5 — **không** dùng cho vận hành thật |
 
 Máy tối thiểu: 8GB RAM (Docker Desktop chiếm ~2–3GB), Windows 10/11.
+
+**Tóm tắt cho máy khách dùng thật (không phải máy dev):** chỉ cần cài **Docker Desktop**. Git/Node chỉ cần
+nếu bàn giao bằng cách kéo mã nguồn (mục 2); nếu bàn giao bằng gói ảnh Docker qua USB (mục 2b — cách khuyến
+nghị khi bán cho khách, vì không lộ mã nguồn theo `ADR-002`) thì máy khách không cần cài gì khác ngoài Docker.
 
 ---
 
@@ -100,6 +104,78 @@ docker compose --profile prod up -d --build   # migrate chạy tự động trư
 ```
 
 Ghi chú: bản cập nhật 09/07/2026 có migration thêm trường mô tả/thông số cho từng dòng báo giá. Lệnh production ở trên đã chạy migrate tự động; máy dev cần chạy `npx prisma migrate dev` sau khi pull.
+
+---
+
+## 2b. Cài cho máy khách qua USB — KHÔNG cần Git, KHÔNG cần mã nguồn
+
+Dùng khi bàn giao cho khách hàng thật: khách chỉ nhận file, không nhận mã nguồn (đúng mô hình bán "cài
+riêng từng doanh nghiệp" — `ADR-002` trong `CLAUDE.md`). Máy khách **chỉ cần cài Docker Desktop**, không
+cần Node.js, không cần Git.
+
+**Chuẩn bị gói cài đặt (làm trên máy dev, 1 lần cho mỗi bản phát hành):**
+
+```bash
+# 1. Build image production
+docker compose --profile prod build
+
+# 2. Đóng gói cả 3 image thành 1 file .tar.gz để chép qua USB
+docker save hoadon-app:latest hoadon-migrate:latest postgres:16-alpine | gzip > release/hoadon-images-<ngay>.tar.gz
+
+# 3. Tạo bản backup CSDL sạch (không lẫn dữ liệu test) để khách có sẵn dữ liệu mẫu/tài khoản mặc định
+#    — dùng scripts/backup-db.ps1 chạy nhắm vào một DB vừa migrate+seed sạch, KHÔNG dùng DB dev đang thao tác thử
+```
+
+Gói cài đặt hoàn chỉnh chép ra USB gồm:
+```
+release/
+├── hoadon-images-<ngay>.tar.gz   # 3 image Docker (app + migrate + postgres), vài trăm MB
+├── hoadon-seed-sach.sql.gz       # backup CSDL sạch: 4 tài khoản mặc định + vài dữ liệu mẫu
+├── docker-compose.yml            # bản có sẵn image: hoadon-app:latest / hoadon-migrate:latest (đã pin tên)
+└── scripts/
+    ├── backup-db.ps1
+    └── dang-ky-backup-hang-ngay.ps1
+```
+
+**Trên máy khách (chỉ cần Docker Desktop đã cài, KHÔNG cần Git/Node/mã nguồn):**
+
+```powershell
+# 1. Chép cả thư mục release\ vào máy khách, ví dụ C:\HoaDon\
+cd C:\HoaDon
+
+# 2. Nạp 3 image vào Docker máy khách (chỉ 1 lần)
+docker load -i hoadon-images-<ngay>.tar.gz
+
+# 3. Tạo file .env cạnh docker-compose.yml, nội dung 1 dòng:
+#    JWT_SECRET=<chuỗi ngẫu nhiên dài ít nhất 32 ký tự — tự sinh riêng cho khách này, đừng dùng lại của máy khác>
+
+# 4. Bật DB trước để phục hồi dữ liệu sạch vào đó
+docker compose up -d db
+
+# 5. Phục hồi dữ liệu mẫu (xem mục 4 — cùng quy trình phục hồi backup, chỉ khác tên file)
+docker exec -i hoadon-db sh -c "dropdb -U hoadon web_xuat_hoa_don && createdb -U hoadon web_xuat_hoa_don"
+Get-Content hoadon-seed-sach.sql.gz -AsByteStream -Raw | docker exec -i hoadon-db sh -c "gunzip | psql -U hoadon web_xuat_hoa_don"
+
+# 6. Bật trọn bộ — KHÔNG có --build (không có Dockerfile/mã nguồn ở đây, chỉ dùng image đã nạp ở bước 2)
+docker compose --profile prod up -d
+
+# 7. Kiểm tra
+docker exec hoadon-db psql -U hoadon web_xuat_hoa_don -c "SELECT username FROM users;"
+# → mở http://localhost:3000, đăng nhập admin/admin123, ĐỔI MẬT KHẨU NGAY (xem checklist mục 3)
+```
+
+**Cập nhật phiên bản mới cho khách đã cài qua USB:** lặp lại "Chuẩn bị gói cài đặt" ở trên với bản code mới,
+gửi file `hoadon-images-<ngay-moi>.tar.gz` mới cho khách (không cần gửi lại `docker-compose.yml`/dữ liệu),
+khách chạy `docker load -i hoadon-images-<ngay-moi>.tar.gz` rồi `docker compose --profile prod up -d`
+(Compose tự nhận ra image mới trùng tên `hoadon-app:latest`/`hoadon-migrate:latest`, không cần down trước).
+
+⚠️ **Vì sao phải có `image:` tường minh trong `docker-compose.yml`:** nếu bỏ trống, Docker Compose tự suy
+tên image từ tên thư mục chứa file (ví dụ khách đặt thư mục `C:\HoaDon` thay vì `webxuathoadon`), khiến
+`docker compose up` không tìm thấy image vừa `docker load` và **âm thầm cố build lại** — nhưng máy khách
+không có Dockerfile/mã nguồn nên sẽ báo lỗi. Đã cố định tên image trong `docker-compose.yml` (`image:
+hoadon-app:latest`, `image: hoadon-migrate:latest`) để khách đặt thư mục tên gì cũng chạy được — đã kiểm
+chứng bằng cách chạy `docker compose --profile prod up -d` (không `--build`) trong thư mục trống hoàn
+toàn không có mã nguồn, chỉ có `docker-compose.yml` đã nạp sẵn image, và app lên đúng (`GET /login` → 200).
 
 ---
 

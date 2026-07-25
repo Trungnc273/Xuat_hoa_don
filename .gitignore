@@ -46,3 +46,6 @@ backups/
 # File người dùng tải lên (dữ liệu runtime, không phải mã nguồn) — chặn commit thêm từ giờ,
 # không đụng các file đã có sẵn trong lịch sử git.
 public/uploads/*
+
+# Gói cài đặt xuất ra để chép qua USB cho máy khách (file .tar Docker image, vài GB) — không commit
+release/

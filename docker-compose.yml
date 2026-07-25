@@ -31,6 +31,7 @@ services:
   # Chạy migration trước khi app khởi động (chỉ profile prod)
   migrate:
     profiles: ["prod"]
+    image: hoadon-migrate:latest
     build:
       context: .
       target: builder
@@ -44,6 +45,7 @@ services:
 
   app:
     profiles: ["prod"]
+    image: hoadon-app:latest
     build:
       context: .
       target: runner
