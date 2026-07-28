@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 
 function formatWithDots(digitsOnly: string): string {
   if (!digitsOnly) return '';
@@ -25,18 +25,39 @@ interface MoneyInputProps {
 }
 
 /**
- * Ô nhập số tiền: tự chèn dấu chấm phân cách nghìn khi gõ (1.350.000),
- * nhưng vẫn nhận đúng nếu người dùng dán/gõ số thô không dấu chấm (1350000).
+ * Ô nhập số tiền: tự chèn dấu chấm phân cách nghìn ngay khi gõ (1000 → 1.000),
+ * vẫn nhận đúng nếu dán/gõ số thô không dấu chấm. Giữ đúng vị trí con trỏ sau khi
+ * chèn dấu chấm — nếu không, gõ chen giữa số sẽ bị bắn con trỏ ra cuối ô.
  */
 export default function MoneyInput({ value, onChange, className, placeholder, required, disabled, id, autoFocus }: MoneyInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const display = value ? formatWithDots(String(value)) : '';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(parseMoneyInput(e.target.value));
+    const input = e.target;
+    const cursorPos = input.selectionStart ?? input.value.length;
+    const digitsBeforeCursor = input.value.slice(0, cursorPos).replace(/\D/g, '').length;
+
+    const numeric = parseMoneyInput(input.value);
+    onChange(numeric);
+
+    // Đặt lại con trỏ đúng sau đúng số chữ số đã gõ (bỏ qua dấu chấm vừa chèn thêm)
+    requestAnimationFrame(() => {
+      if (!inputRef.current) return;
+      const newDisplay = formatWithDots(String(numeric));
+      let digitsSeen = 0;
+      let pos = 0;
+      while (pos < newDisplay.length && digitsSeen < digitsBeforeCursor) {
+        if (/\d/.test(newDisplay[pos])) digitsSeen++;
+        pos++;
+      }
+      inputRef.current.setSelectionRange(pos, pos);
+    });
   };
 
   return (
     <input
+      ref={inputRef}
       id={id}
       type="text"
       inputMode="numeric"
