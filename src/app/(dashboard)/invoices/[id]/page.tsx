@@ -170,6 +170,11 @@ export default function InvoiceDetailPage() {
   const [savingPaid, setSavingPaid] = useState(false);
   const [paidError, setPaidError] = useState('');
 
+  const [isEditingVat, setIsEditingVat] = useState(false);
+  const [editVatRate, setEditVatRate] = useState('');
+  const [savingVat, setSavingVat] = useState(false);
+  const [vatError, setVatError] = useState('');
+
   const { user } = useApp();
   const canEditInvoice = ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(user?.role || '');
   // Chỉ chặn sửa MẶT HÀNG khi đã có thanh toán — vẫn sửa được ghi chú/thông tin bổ sung
@@ -464,6 +469,57 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  // Sửa nhanh VAT chung ngay tại chỗ (không cần vào chế độ Sửa hóa đơn) — áp cho mọi dòng hàng,
+  // chỉ cho phép khi chưa phát sinh thanh toán (cùng ràng buộc với sửa mặt hàng)
+  const handleStartEditVat = () => {
+    if (!invoice) return;
+    setVatError('');
+    setEditVatRate((invoice.items[0]?.vatRate ?? 0).toString());
+    setIsEditingVat(true);
+  };
+
+  const handleSaveVat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVatError('');
+    if (!invoice) return;
+    const rate = Number(editVatRate);
+    if (Number.isNaN(rate) || rate < 0 || rate > 100) {
+      setVatError('VAT phải từ 0 đến 100%');
+      return;
+    }
+
+    setSavingVat(true);
+    try {
+      const items = invoice.items.map((item) => ({
+        productId: item.productId || undefined,
+        productName: item.productName,
+        productSku: item.productSku || undefined,
+        description: item.description || undefined,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        vatRate: rate,
+        discountRate: item.discountRate,
+      }));
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setVatError(data.details?.[0]?.message || data.error || 'Không lưu được thay đổi');
+        return;
+      }
+      setStockWarnings(data.stockWarnings || []);
+      setIsEditingVat(false);
+      void fetchData();
+    } catch {
+      setVatError('Lỗi kết nối máy chủ');
+    } finally {
+      setSavingVat(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full w-full items-center justify-center min-h-[400px]">
@@ -518,6 +574,42 @@ export default function InvoiceDetailPage() {
       </span>
     </div>
   );
+
+  // Dòng "Thuế GTGT (VAT)" dùng chung cho cả 3 mẫu — sửa nhanh tại chỗ, áp cho mọi dòng hàng
+  const vatBlock = invoice.vatAmount > 0 || isEditingVat ? (
+    isEditingVat ? (
+      <form onSubmit={handleSaveVat} className="rounded-lg border border-dashed border-gray-400 p-2 space-y-1.5 print:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-gray-500">VAT áp dụng cho cả đơn (%):</span>
+          <input
+            type="number" min="0" max="100" autoFocus
+            value={editVatRate}
+            onChange={(e) => setEditVatRate(e.target.value)}
+            className="w-20 rounded border border-gray-300 px-2 py-1 text-right font-bold"
+          />
+        </div>
+        {vatError && <p className="text-[10px] text-red-500">{vatError}</p>}
+        <div className="flex justify-end gap-1.5">
+          <button type="button" onClick={() => setIsEditingVat(false)} className="rounded px-2 py-1 text-[10px] font-bold border border-gray-300 hover:bg-gray-50">Hủy</button>
+          <button type="submit" disabled={savingVat} className="rounded px-2 py-1 text-[10px] font-bold bg-gray-800 text-white hover:opacity-90 disabled:opacity-50">
+            {savingVat ? 'Đang lưu...' : 'Lưu'}
+          </button>
+        </div>
+      </form>
+    ) : (
+      <div className="flex justify-between items-center">
+        <span>Thuế GTGT (VAT):</span>
+        <span className="inline-flex items-center gap-1.5">
+          +{formatCurrency(invoice.vatAmount)}
+          {canEditInvoice && invoice.status !== 'CANCELLED' && !hasPayment && (
+            <button type="button" onClick={handleStartEditVat} title="Sửa VAT" className="print:hidden text-gray-400 hover:text-gray-700 cursor-pointer">
+              <PenLine className="h-3 w-3" />
+            </button>
+          )}
+        </span>
+      </div>
+    )
+  ) : null;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -858,12 +950,7 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="space-y-2 text-xs text-gray-700 font-semibold ml-auto w-full max-w-[280px]">
-                {invoice.vatAmount > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span>Thuế GTGT (VAT):</span>
-                    <span>+{formatCurrency(invoice.vatAmount)}</span>
-                  </div>
-                )}
+                {vatBlock}
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-black text-gray-800">TỔNG CỘNG:</span>
                   <span className="font-black text-gray-900 text-base">{formatCurrency(invoice.total)}</span>
@@ -984,12 +1071,7 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="w-full sm:w-72 space-y-2 text-xs font-semibold text-gray-700">
-                {invoice.vatAmount > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span>Thuế GTGT (VAT):</span>
-                    <span>+{formatCurrency(invoice.vatAmount)}</span>
-                  </div>
-                )}
+                {vatBlock}
                 <div className="border-t-2 border-indigo-600 pt-2 flex justify-between items-center text-sm font-extrabold text-indigo-950">
                   <span>TỔNG CỘNG:</span>
                   <span className="text-base">{formatCurrency(invoice.total)}</span>
@@ -1074,12 +1156,7 @@ export default function InvoiceDetailPage() {
 
             <div className="mt-8 flex justify-end">
               <div className="w-64 space-y-2 text-xs font-semibold text-gray-800">
-                {invoice.vatAmount > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span>VAT:</span>
-                    <span>+{formatCurrency(invoice.vatAmount)}</span>
-                  </div>
-                )}
+                {vatBlock}
                 <div className="border-t border-gray-900 pt-2 flex justify-between items-center text-sm font-bold text-gray-900">
                   <span>Total Amount:</span>
                   <span>{formatCurrency(invoice.total)}</span>
