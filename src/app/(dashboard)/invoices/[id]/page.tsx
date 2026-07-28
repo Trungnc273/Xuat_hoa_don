@@ -365,6 +365,15 @@ export default function InvoiceDetailPage() {
 
   const editTotal = editItems.reduce((sum, item) => sum + item.amount, 0);
 
+  // Sửa VAT chung 1 chỗ ở ô tổng tiền — áp đồng loạt cho mọi dòng hàng, không cần hiện cột riêng
+  const handleApplyVatToAllEdit = (newVat: number) => {
+    setEditItems((cur) => cur.map((item) => ({
+      ...item,
+      vatRate: newVat,
+      amount: calcItemAmount(item.unitPrice, item.quantity, newVat, item.discountRate),
+    })));
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError('');
@@ -708,7 +717,18 @@ export default function InvoiceDetailPage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-end items-center gap-4">
+              {!hasPayment && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                  <span>VAT áp dụng cho cả đơn (%):</span>
+                  <input
+                    type="number" min="0" max="100"
+                    value={editItems[0]?.vatRate ?? 0}
+                    onChange={(e) => handleApplyVatToAllEdit(parseFloat(e.target.value) || 0)}
+                    className="w-16 rounded border border-gray-300 px-1 py-0.5 text-right"
+                  />
+                </div>
+              )}
               <div className="text-sm font-black text-gray-800">
                 Tổng tiền: <span className="text-base">{formatCurrency(editTotal)}</span>
               </div>
@@ -838,6 +858,12 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="space-y-2 text-xs text-gray-700 font-semibold ml-auto w-full max-w-[280px]">
+                {invoice.vatAmount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span>Thuế GTGT (VAT):</span>
+                    <span>+{formatCurrency(invoice.vatAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-black text-gray-800">TỔNG CỘNG:</span>
                   <span className="font-black text-gray-900 text-base">{formatCurrency(invoice.total)}</span>
@@ -958,6 +984,12 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="w-full sm:w-72 space-y-2 text-xs font-semibold text-gray-700">
+                {invoice.vatAmount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span>Thuế GTGT (VAT):</span>
+                    <span>+{formatCurrency(invoice.vatAmount)}</span>
+                  </div>
+                )}
                 <div className="border-t-2 border-indigo-600 pt-2 flex justify-between items-center text-sm font-extrabold text-indigo-950">
                   <span>TỔNG CỘNG:</span>
                   <span className="text-base">{formatCurrency(invoice.total)}</span>
@@ -1042,6 +1074,12 @@ export default function InvoiceDetailPage() {
 
             <div className="mt-8 flex justify-end">
               <div className="w-64 space-y-2 text-xs font-semibold text-gray-800">
+                {invoice.vatAmount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span>VAT:</span>
+                    <span>+{formatCurrency(invoice.vatAmount)}</span>
+                  </div>
+                )}
                 <div className="border-t border-gray-900 pt-2 flex justify-between items-center text-sm font-bold text-gray-900">
                   <span>Total Amount:</span>
                   <span>{formatCurrency(invoice.total)}</span>

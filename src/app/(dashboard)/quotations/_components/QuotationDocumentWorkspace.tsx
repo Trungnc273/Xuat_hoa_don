@@ -447,6 +447,15 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
     )));
   };
 
+  // Sửa VAT chung 1 chỗ ở ô tổng tiền — áp đồng loạt cho mọi dòng hàng, không cần hiện cột riêng
+  const handleApplyVatToAll = (newVat: number) => {
+    setItems((currentItems) => currentItems.map((item) => ({
+      ...item,
+      vatRate: newVat,
+      amount: calculateItemAmount(item.unitPrice, item.quantity, newVat, item.discountRate),
+    })));
+  };
+
   const totals = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -929,6 +938,22 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
 
         <div className="mt-8 flex justify-end">
           <div className="w-80 space-y-2 text-xs text-gray-700 font-semibold">
+            {isEditing ? (
+              <div className="flex justify-between items-center gap-2">
+                <span>VAT áp dụng cho cả đơn (%):</span>
+                <input
+                  type="number" min="0" max="100"
+                  value={items[0]?.vatRate ?? 0}
+                  onChange={(e) => handleApplyVatToAll(parseFloat(e.target.value) || 0)}
+                  className="w-16 rounded border border-gray-300 px-1 py-0.5 text-right"
+                />
+              </div>
+            ) : totals.vatAmount > 0 && (
+              <div className="flex justify-between items-center">
+                <span>Thuế GTGT (VAT):</span>
+                <span>+{formatCurrency(totals.vatAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-sm">
               <span className="font-black text-gray-800 uppercase">Tổng tiền thanh toán:</span>
               <span className="font-black text-gray-900 text-base">{formatCurrency(totals.total)}</span>
