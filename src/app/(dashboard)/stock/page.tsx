@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { 
+import {
   Warehouse, RefreshCw,
-  X, ChevronLeft, ChevronRight
+  X, ChevronLeft, ChevronRight, Trash2
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -87,6 +87,22 @@ export default function StockPage() {
       console.error(err);
     } finally {
       setLoadingWarehouses(false);
+    }
+  };
+
+  // Xóa kho hàng — API tự chặn nếu kho đã có lịch sử xuất/nhập/kiểm kê
+  const handleDeleteWarehouse = async (wh: WarehouseItem) => {
+    if (!confirm(`Xóa kho "${wh.name}"? Chỉ xóa được nếu kho này chưa có lượt xuất/nhập/kiểm kê nào.`)) return;
+    try {
+      const res = await fetch(`/api/warehouses/${wh.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        void fetchWarehouses();
+      } else {
+        alert(data.error || 'Không xóa được kho hàng');
+      }
+    } catch {
+      alert('Không thể thực hiện xóa kho hàng');
     }
   };
 
@@ -248,11 +264,20 @@ export default function StockPage() {
                 <div className="rounded-lg bg-primary/10 p-2 text-primary">
                   <Warehouse className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-bold">{wh.name}</h4>
                   <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{wh.code}</p>
                   <p className="text-xs text-muted-foreground mt-2">{wh.address || 'Không có địa chỉ'}</p>
                 </div>
+                {['ADMIN', 'MANAGER'].includes(user?.role || '') && (
+                  <button
+                    onClick={() => handleDeleteWarehouse(wh)}
+                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer flex-shrink-0"
+                    title="Xóa kho hàng"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
