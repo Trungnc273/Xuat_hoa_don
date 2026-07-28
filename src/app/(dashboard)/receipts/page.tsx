@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Receipt {
   id: string;
@@ -284,11 +285,10 @@ export default function ReceiptsPage() {
 
               <div>
                 <label className="block font-semibold mb-1">Số tiền thu nợ *</label>
-                <input
-                  type="number"
+                <MoneyInput
                   required
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={amount ? Number(amount) : 0}
+                  onChange={(v) => setAmount(v ? v.toString() : '')}
                   className="w-full rounded border border-border p-2 focus:outline-none bg-transparent font-bold text-sm"
                   placeholder="Nhập số tiền thu"
                 />

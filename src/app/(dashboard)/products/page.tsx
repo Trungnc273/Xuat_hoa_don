@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import MoneyInput from '@/components/MoneyInput';
 import * as XLSX from 'xlsx';
 
 interface Product {
@@ -574,10 +575,9 @@ export default function ProductsPage() {
           {priceTiers.map((tier) => (
             <div key={tier.id}>
               <label className="block font-semibold mb-1">Giá {tier.name} (VND)</label>
-              <input
-                type="number"
-                value={tierPriceValues[tier.id] || ''}
-                onChange={(e) => setTierPriceValues((current) => ({ ...current, [tier.id]: e.target.value }))}
+              <MoneyInput
+                value={tierPriceValues[tier.id] ? parseFloat(tierPriceValues[tier.id]) : 0}
+                onChange={(v) => setTierPriceValues((current) => ({ ...current, [tier.id]: v ? v.toString() : '' }))}
                 className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent"
               />
             </div>
@@ -842,11 +842,11 @@ export default function ProductsPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-semibold mb-1">Giá nhập (VND) *</label>
-                  <input type="number" required value={importPrice} onChange={(e) => setImportPrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                  <MoneyInput required value={importPrice ? parseFloat(importPrice) : 0} onChange={(v) => setImportPrice(v ? v.toString() : '')} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Giá khách lẻ (VND) *</label>
-                  <input type="number" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                  <MoneyInput required value={salePrice ? parseFloat(salePrice) : 0} onChange={(v) => setSalePrice(v ? v.toString() : '')} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Thuế VAT (%)</label>
@@ -958,11 +958,11 @@ export default function ProductsPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-semibold mb-1">Giá nhập (VND) *</label>
-                  <input type="number" required value={importPrice} onChange={(e) => setImportPrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                  <MoneyInput required value={importPrice ? parseFloat(importPrice) : 0} onChange={(v) => setImportPrice(v ? v.toString() : '')} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Giá khách lẻ (VND) *</label>
-                  <input type="number" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
+                  <MoneyInput required value={salePrice ? parseFloat(salePrice) : 0} onChange={(v) => setSalePrice(v ? v.toString() : '')} className="w-full rounded border border-border p-2 focus:outline-none focus:border-foreground bg-transparent" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Thuế VAT (%)</label>

@@ -21,6 +21,7 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
 import CustomerTagChip from '@/components/CustomerTagChip';
+import MoneyInput from '@/components/MoneyInput';
 
 type WorkspaceMode = 'create' | 'view';
 
@@ -908,7 +909,7 @@ export default function QuotationDocumentWorkspace({ mode, quotationId, startEdi
                         {isEditing ? <input type="number" min="1" required value={item.quantity} onChange={(e) => handleItemValueChange(index, 'quantity', e.target.value)} className="w-16 rounded border border-gray-300 px-1 py-1 text-center" /> : item.quantity}
                       </td>
                       <td className="py-2.5 px-2 text-right text-gray-600">
-                        {isEditing ? <input type="number" min="0" required value={item.unitPrice} onChange={(e) => handleItemValueChange(index, 'unitPrice', e.target.value)} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" /> : formatCurrency(item.unitPrice)}
+                        {isEditing ? <MoneyInput required value={item.unitPrice} onChange={(v) => handleItemValueChange(index, 'unitPrice', v.toString())} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" /> : formatCurrency(item.unitPrice)}
                       </td>
                       <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                       {isEditing && (

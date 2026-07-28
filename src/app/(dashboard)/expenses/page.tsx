@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Expense {
   id: string;
@@ -275,13 +276,12 @@ export default function ExpensesPage() {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Số tiền chi tiêu *</label>
-                  <input
-                    type="number"
+                  <MoneyInput
                     required
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    value={amount ? Number(amount) : 0}
+                    onChange={(v) => setAmount(v ? v.toString() : '')}
                     className="w-full rounded border border-border p-2 focus:outline-none bg-transparent font-bold"
-                    placeholder="e.g. 1500000"
+                    placeholder="Ví dụ: 1.500.000"
                   />
                 </div>
               </div>

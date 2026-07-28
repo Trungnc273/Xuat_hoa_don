@@ -11,6 +11,7 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
 import CustomerTagChip from '@/components/CustomerTagChip';
+import MoneyInput from '@/components/MoneyInput';
 
 interface CustomerPriceTier {
   id: string;
@@ -480,10 +481,10 @@ export default function InvoiceDetailPage() {
     <form onSubmit={handleSavePaidAmount} className="rounded-lg border border-dashed border-emerald-400 p-2 space-y-1.5 print:hidden">
       <div className="flex items-center justify-between gap-2">
         <span className="text-gray-500">Đã thanh toán:</span>
-        <input
-          type="number" min="0" step="1000" autoFocus
-          value={editPaidAmount}
-          onChange={(e) => setEditPaidAmount(e.target.value)}
+        <MoneyInput
+          autoFocus
+          value={editPaidAmount ? Number(editPaidAmount) : 0}
+          onChange={(v) => setEditPaidAmount(v ? v.toString() : '')}
           className="w-32 rounded border border-gray-300 px-2 py-1 text-right font-bold"
         />
       </div>
@@ -691,7 +692,7 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="py-2.5 px-2 text-right text-gray-600">
                         {hasPayment ? formatCurrency(item.unitPrice) : (
-                          <input type="number" min="0" required value={item.unitPrice} onChange={(e) => handleEditItemValueChange(index, 'unitPrice', e.target.value)} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" />
+                          <MoneyInput required value={item.unitPrice} onChange={(v) => handleEditItemValueChange(index, 'unitPrice', v.toString())} className="w-28 rounded border border-gray-300 px-1 py-1 text-right" />
                         )}
                       </td>
                       <td className="py-2.5 px-2 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
@@ -1099,13 +1100,12 @@ export default function InvoiceDetailPage() {
             <form onSubmit={handlePaySubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold mb-1">Số tiền thu nợ *</label>
-                <input
-                  type="number"
+                <MoneyInput
                   required
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
+                  value={payAmount ? Number(payAmount) : 0}
+                  onChange={(v) => setPayAmount(v ? v.toString() : '')}
                   className="w-full rounded border border-border p-2.5 bg-transparent focus:outline-none focus:border-foreground font-extrabold text-sm"
-                  placeholder="e.g. 5000000"
+                  placeholder="Ví dụ: 5.000.000"
                 />
                 <span className="text-[10px] text-muted-foreground mt-1 block">Dư nợ còn lại tối đa: {formatCurrency(invoice.remainingAmount)}</span>
               </div>
